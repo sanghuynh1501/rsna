@@ -19,7 +19,7 @@ class AutoEncoderDataset(tf.data.Dataset):
             image_generator,
             output_signature = (
                 tf.TensorSpec(shape = (batch_size, 100352), dtype = tf.float32),
-                tf.TensorSpec(shape = (batch_size, 64, 64, 1), dtype = tf.float32),
+                tf.TensorSpec(shape = (batch_size, 32, 32, 1), dtype = tf.float32),
             ),
             args=(folder, samples, batch_size)
         )

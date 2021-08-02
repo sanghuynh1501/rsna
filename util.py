@@ -42,7 +42,7 @@ def read_image_numpy(image_path, gayscale=False):
         return image
     else:
         gray = cv2.imread(image_path, 0)
-        gray = cv2.resize(gray, (64, 64))
+        gray = cv2.resize(gray, (32, 32))
         gray = np.expand_dims(gray, -1)
         gray = np.expand_dims(gray, 0)
         return image, gray
@@ -67,7 +67,8 @@ def image_generator(data_folder, sample_list, batch_size=128):
                         image, gray = read_image_numpy(f'{folder_link}/{sub_folder}/{image}', True)
                         if images.shape[0] >= batch_size:
                             images, grays = random_datas(images, grays)
-                            grays = grays.astype(np.float32) / 255
+                            grays = grays.astype(np.float32)
+                            grays = (grays - 127.5) / 127.5
                             yield images, grays
                             images = image
                             grays = gray

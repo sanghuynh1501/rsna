@@ -1,5 +1,5 @@
 import pickle
-
+import cv2
 import numpy as np
 from tf_data import AutoEncoderDataset
 from models import AutoEncoder
@@ -9,7 +9,7 @@ from tensorflow.keras.layers import Dense, Flatten, Conv2D
 from tensorflow.keras import Model
 
 loss_object = tf.keras.losses.MeanSquaredError()
-optimizer = tf.keras.optimizers.Adam()
+optimizer = tf.keras.optimizers.Adam(learning_rate=0.0002, beta_1=0.5)
 
 train_loss = tf.keras.metrics.Mean(name='train_loss')
 # train_accuracy = tf.keras.metrics.BinaryCrossentropy(name='train_accuracy')
@@ -44,11 +44,20 @@ def test_step(images, labels):
   test_loss(t_loss)
 #   test_accuracy(labels, predictions)
 
-EPOCHS = 5
+def generate_image(images):
+  predictions = model(images, training=False)
+  for idx, image in enumerate(predictions):
+      image = np.reshape(image, (32, 32))
+      image = (image * 127.5) + 127.5
+      image = image.astype(np.int32)
+      cv2.imwrite(f'images/image_{idx}.png', image)
+
+EPOCHS = 100
 
 with open('pickle/X_train.pkl', 'rb') as f:
     X_train = pickle.load(f)
     f.close()
+
 with open('pickle/X_test.pkl', 'rb') as f:
     X_test = pickle.load(f)
     f.close()
@@ -88,6 +97,11 @@ for epoch in range(EPOCHS):
         print('Saving checkpoint for epoch {} at {}'.format(epoch + 1,
                                                             ckpt_save_path))
         min_loss = test_loss.result()
+
+    if epoch % 5 == 0:
+        for image, _ in train_data:
+            generate_image(image)
+            break
 
     print(
         f'Epoch {epoch + 1}, '
