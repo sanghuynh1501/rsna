@@ -3,7 +3,7 @@ import csv
 import numpy as np
 import matplotlib.pyplot as plt
 
-DATA_FEATURE = 'data/feature/train'
+DATA_FEATURE = 'data/origin/test'
 
 positive_count = 0
 negative_count = 0

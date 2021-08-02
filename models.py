@@ -47,6 +47,16 @@ class AutoEncoder(Model):
     x = self.leakyRelu(self.dense1(x))
     x = self.leakyRelu(self.dense2(x))
     return x
+  
+  def image_generate(self, x):
+    x = self.leakyRelu(self.dense3(x))
+    x = self.leakyRelu(self.reshape(x))
+
+    x = self.leakyRelu(self.up0(x))
+    x = self.leakyRelu(self.up1(x))
+    x = self.leakyRelu(self.up2(x))
+    x = self.conv0(x)
+    return x
 
 if __name__ == "__main__":
     image = np.ones((32, 100352))

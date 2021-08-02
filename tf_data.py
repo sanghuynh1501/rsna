@@ -6,9 +6,10 @@ import matplotlib.pyplot as plt
 
 import tensorflow as tf
 
-from util import image_generator
+from util import image_generator, sequence_generator
 
 DATA_ORIGIN_TRAIN = 'data/origin/train'
+DATA_FEATURE_TRAIN = 'data/feature_512/train'
 
 fig, axs = plt.subplots(1, 2)
 fig.suptitle('Vertically stacked subplots')
@@ -22,6 +23,18 @@ class AutoEncoderDataset(tf.data.Dataset):
                 tf.TensorSpec(shape = (batch_size, 32, 32, 1), dtype = tf.float32),
             ),
             args=(folder, samples, batch_size)
+        )
+        return data
+
+class TransformerDataset(tf.data.Dataset):
+    def __new__(self, folder, samples, labels, type, batch_size):
+        data = tf.data.Dataset.from_generator(
+            sequence_generator,
+            output_signature = (
+                tf.TensorSpec(shape = (None, None, 512), dtype = tf.float32),
+                tf.TensorSpec(shape = (None, 1), dtype = tf.float32),
+            ),
+            args=(folder, samples, labels, type, batch_size)
         )
         return data
 
@@ -49,6 +62,10 @@ if __name__ == "__main__":
         f.close()
 
     batch_size = 32
-    test_data = AutoEncoderDataset(DATA_ORIGIN_TRAIN, X_train, batch_size).prefetch(tf.data.AUTOTUNE)
+    # test_data = AutoEncoderDataset(DATA_ORIGIN_TRAIN, X_train, batch_size).prefetch(tf.data.AUTOTUNE)
+        
+    # benchmark(test_data)
+    print('y_test ', y_test)
+    test_data = TransformerDataset(DATA_FEATURE_TRAIN, X_train, y_train, 'FLAIR',  batch_size).prefetch(tf.data.AUTOTUNE)
         
     benchmark(test_data)

@@ -1,7 +1,5 @@
 import os
-from util import extract_feature, read_image
-from retrain_model import feature_extractor
-import cv2
+from util import extract_feature, read_image, write_feature
 from tqdm import tqdm
 
 import numpy as np
@@ -18,24 +16,11 @@ try:
 except:
   pass
 
-image_stacks = []
-
-def write_feature(images, links):
-    for image, link in zip(images, links):
-        link = link.replace('origin', 'feature')
-        link = link.replace('.png', '.npy')
-        folder = '/'.join(link.split('/')[:-1])
-        if not os.path.isdir(folder):
-            os.makedirs(folder)
-        np.save(link, image)
-
 image_stacks = None
 link_stacks = []
 data = os.listdir(DATA_ORIGIN)
 test_length = len(os.listdir(DATA_ORIGIN + '/' + 'test'))
 train_length = len(os.listdir(DATA_ORIGIN + '/' + 'train'))
-
-print('train_length ', train_length)
 
 with tqdm(total=(test_length + train_length)) as pbar:
     for data_folder in data:

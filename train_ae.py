@@ -1,4 +1,5 @@
 import pickle
+from util import generate_image
 import cv2
 import numpy as np
 from tf_data import AutoEncoderDataset
@@ -43,14 +44,6 @@ def test_step(images, labels):
 
   test_loss(t_loss)
 #   test_accuracy(labels, predictions)
-
-def generate_image(images):
-  predictions = model(images, training=False)
-  for idx, image in enumerate(predictions):
-      image = np.reshape(image, (32, 32))
-      image = (image * 127.5) + 127.5
-      image = image.astype(np.int32)
-      cv2.imwrite(f'images/image_{idx}.png', image)
 
 EPOCHS = 100
 
@@ -100,7 +93,7 @@ for epoch in range(EPOCHS):
 
     if epoch % 5 == 0:
         for image, _ in train_data:
-            generate_image(image)
+            generate_image(model, image, epoch, isFull=True)
             break
 
     print(
