@@ -24,13 +24,16 @@ DATA_ORIGIN_TRAIN = 'data/origin/train'
 
 @tf.function
 def train_step(images, labels):
-  with tf.GradientTape() as tape:
-    # training=True is only needed if there are layers with different
-    # behavior during training versus inference (e.g. Dropout).
-    predictions = model(images, training=True)
-    loss = loss_object(labels, predictions)
-  gradients = tape.gradient(loss, model.trainable_variables)
-  optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+#   with tf.GradientTape() as tape:
+#     # training=True is only needed if there are layers with different
+#     # behavior during training versus inference (e.g. Dropout).
+#     predictions = model(images, training=True)
+#     loss = loss_object(labels, predictions)
+#   gradients = tape.gradient(loss, model.trainable_variables)
+#   optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+
+  predictions = model(images, training=False)
+  loss = loss_object(labels, predictions)
 
   train_loss(loss)
 #   train_accuracy(labels, predictions)
@@ -59,7 +62,7 @@ batch_size = 32
 train_data = AutoEncoderDataset(DATA_ORIGIN_TRAIN, X_train, batch_size).prefetch(tf.data.AUTOTUNE)
 test_data = AutoEncoderDataset(DATA_ORIGIN_TRAIN, X_test, batch_size).prefetch(tf.data.AUTOTUNE)
 
-checkpoint_path = 'weights/autoencoder'
+checkpoint_path = 'weights/autoencoder_v2'
 
 ckpt = tf.train.Checkpoint(transformer=model,
                            optimizer=optimizer)
@@ -79,20 +82,20 @@ for epoch in range(EPOCHS):
     test_loss.reset_states()
     # test_accuracy.reset_states()
 
-    for image, gray in train_data:
-        train_step(image, gray)
+    # for image, gray in train_data:
+    #     train_step(image, gray)
 
-    for image, gray in test_data:
-        test_step(image, gray)
+    # for image, gray in test_data:
+    #     test_step(image, gray)
 
-    if test_loss.result() < min_loss:
-        ckpt_save_path = ckpt_manager.save()
-        print('Saving checkpoint for epoch {} at {}'.format(epoch + 1,
-                                                            ckpt_save_path))
-        min_loss = test_loss.result()
+    # if test_loss.result() < min_loss:
+    #     ckpt_save_path = ckpt_manager.save()
+    #     print('Saving checkpoint for epoch {} at {}'.format(epoch + 1,
+    #                                                         ckpt_save_path))
+    #     min_loss = test_loss.result()
 
     if epoch % 5 == 0:
-        for image, _ in train_data:
+        for image, _ in test_data:
             generate_image(model, image, epoch, isFull=True)
             break
 

@@ -13,7 +13,7 @@ model = AutoEncoder()
 
 optimizer = tf.keras.optimizers.Adam(learning_rate=0.0002, beta_1=0.5)
 
-checkpoint_path = 'weights/autoencoder'
+checkpoint_path = 'weights/autoencoder_v2'
 
 ckpt = tf.train.Checkpoint(transformer=model,
                            optimizer=optimizer)
@@ -31,7 +31,8 @@ train_length = len(os.listdir(DATA_FEATURE + '/' + 'train'))
 image_stacks = None
 link_stacks = []
 
-dem = 0
+min = float('inf')
+max = float('-inf')
 
 with tqdm(total=(test_length + train_length)) as pbar:
     for data_folder in data:
@@ -41,15 +42,22 @@ with tqdm(total=(test_length + train_length)) as pbar:
                     image_path = DATA_FEATURE + '/' + data_folder + '/' + sub_folder + '/' + type_image + '/' + image
                     image = np.load(image_path)
                     image = np.expand_dims(image, 0)
-                    if image_stacks is None:
-                        image_stacks = image
-                        link_stacks = [image_path]
-                    else:
-                        if image_stacks.shape[0] >= STACK_SIZE:
-                            generate_image(model, image_stacks, dem, isFull=False)
-                            image_stacks = None
-                            dem += 1
-                        else:
-                            image_stacks = np.concatenate([image_stacks, image], 0)
-                            link_stacks.append(image_path)
+                    print(np.min(image))
+                    if np.min(image) < min:
+                        min = np.min(image)
+                    if np.max(image) > max:
+                        max = np.max(image)
+                    # if image_stacks is None:
+                    #     image_stacks = image
+                    #     link_stacks = [image_path]
+                    # else:
+                    #     if image_stacks.shape[0] >= STACK_SIZE:
+                    #         generate_image(model, image_stacks, dem, isFull=False)
+                    #         image_stacks = None
+                    #         dem += 1
+                    #     else:
+                    #         image_stacks = np.concatenate([image_stacks, image], 0)
+                    #         link_stacks.append(image_path)
             pbar.update(1)
+
+print('min ', min, max)

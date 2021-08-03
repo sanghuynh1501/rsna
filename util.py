@@ -10,6 +10,13 @@ import tensorflow as tf
 
 from retrain_model import feature_extractor
 
+def create_padding_mask(seq):
+    seq = tf.cast(seq, tf.float32)
+
+    # add extra dimensions to add the padding
+    # to the attention logits.
+    return seq[:, tf.newaxis, tf.newaxis, :]
+
 def write_feature(images, links):
     for image, link in zip(images, links):
         link = link.replace('origin', 'feature')
@@ -37,6 +44,13 @@ def random_datas(data, labels):
     labels_shuffled = labels[sshuffler]
     return data_shuffled, labels_shuffled
 
+def random_datas_three(data, lengths, labels):
+    sshuffler = np.random.permutation(len(data))
+    data_shuffled = data[sshuffler]
+    lengths_shuffled = lengths[sshuffler]
+    labels_shuffled = labels[sshuffler]
+    return data_shuffled, lengths_shuffled, labels_shuffled
+
 def padding_data(data, max_len=400):
     while len(data) < max_len:
         data = np.concatenate([data, np.zeros((1, 512))], 0)
@@ -44,6 +58,7 @@ def padding_data(data, max_len=400):
 
 def clip_data(data, lengths):
     max_length = np.max(lengths)
+
     results = np.array([])
     for feature in data:
         clip_feature = feature[:max_length]
@@ -52,20 +67,26 @@ def clip_data(data, lengths):
             results = clip_feature
         else:
             results = np.concatenate([results, clip_feature], 0)
-    return results
 
-def read_image(image_path, gayscale=False):
+    masks = np.array([])
+    for length in lengths:
+        mask = [0] * length
+        while len(mask) < max_length:
+            mask.append(1)
+        mask = np.expand_dims(mask, 0)
+        if masks.shape[0] == 0:
+            masks = mask
+        else:
+            masks = np.concatenate([masks, mask], 0)
+
+    return results, create_padding_mask(masks)
+
+def read_image(image_path):
     origin_image = cv2.imread(image_path)
-    origin_image = cv2.resize(origin_image, (64, 64))
+    origin_image = cv2.resize(origin_image, (224, 224))
     image = cv2.cvtColor(origin_image, cv2.COLOR_BGR2RGB)
     image = np.expand_dims(image, 0)
-    if not gayscale:
-        return image
-    else:
-        gray = cv2.cvtColor(origin_image, cv2.COLOR_BGR2GRAY)
-        gray = np.expand_dims(gray, -1)
-        gray = np.expand_dims(gray, 0)
-        return image, gray
+    return image
 
 def read_image_numpy(image_path, gayscale=False):
     numpy_path = image_path.replace('origin', 'feature')
@@ -169,8 +190,9 @@ def sequence_generator(data_folder, sample_list, labels_list, type, batch_size=1
                 sequence, length = get_random_sequence(folder_link, type)
 
                 if sequences.shape[0] >= batch_size or idx >= len(sample_list) - 1:
-                    sequences, labels = random_datas(sequences, labels)
-                    yield clip_data(sequences, lengths), labels
+                    sequences, lengths, labels = random_datas_three(sequences, lengths, labels)
+                    sequences, masks = clip_data(sequences, lengths)
+                    yield sequences, masks, labels
                     sequences = sequence
                     labels = label
                     lengths = length

@@ -32,6 +32,7 @@ class TransformerDataset(tf.data.Dataset):
             sequence_generator,
             output_signature = (
                 tf.TensorSpec(shape = (None, None, 512), dtype = tf.float32),
+                tf.TensorSpec(shape = (None, 1, 1, None), dtype = tf.float32),
                 tf.TensorSpec(shape = (None, 1), dtype = tf.float32),
             ),
             args=(folder, samples, labels, type, batch_size)
@@ -42,9 +43,8 @@ if __name__ == "__main__":
     def benchmark(dataset, num_epochs=2):
         start_time = time.perf_counter()
         for epoch_num in range(num_epochs):
-            for image, gray in dataset:
-                print(image.shape, np.sum(image))
-                print(gray.shape, np.sum(gray))
+            for image, mask, gray in dataset:
+                print(image)
                 # Performing a training step
         print("Execution time:", time.perf_counter() - start_time)
 
