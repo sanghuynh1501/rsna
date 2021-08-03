@@ -199,9 +199,9 @@ class AutoEncoder(Model):
         
         self.leakyRelu = LeakyReLU(alpha=0.2)
 
-        self.dense0 = Dense(2048)
-        self.dense1 = Dense(1024)
-        self.dense2 = Dense(512)
+        self.dense0 = Dense(2048, activation='relu')
+        self.dense1 = Dense(1024, activation='relu')
+        self.dense2 = Dense(512, activation='relu')
         self.dense3 = Dense(256 * 4 * 4)
         self.reshape = Reshape((4, 4, 256))
 
@@ -211,9 +211,9 @@ class AutoEncoder(Model):
         self.conv0 = Conv2D(1, (3,3), activation='tanh', padding='same')
 
     def call(self, x):
-        x = self.leakyRelu(self.dense0(x))
-        x = self.leakyRelu(self.dense1(x))
-        x = self.leakyRelu(self.dense2(x))
+        x = self.dense0(x)
+        x = self.dense1(x)
+        x = self.dense2(x)
         x = self.leakyRelu(self.dense3(x))
         x = self.leakyRelu(self.reshape(x))
 
@@ -225,9 +225,9 @@ class AutoEncoder(Model):
         return x
 
     def feature_extract(self, x):
-        x = self.leakyRelu(self.dense0(x))
-        x = self.leakyRelu(self.dense1(x))
-        x = self.leakyRelu(self.dense2(x))
+        x = self.dense0(x)
+        x = self.dense1(x)
+        x = self.dense2(x)
         return x
     
     def image_generate(self, x):

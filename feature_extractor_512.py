@@ -14,7 +14,7 @@ model = AutoEncoder()
 
 optimizer = tf.keras.optimizers.Adam(learning_rate=0.0002, beta_1=0.5)
 
-checkpoint_path = 'weights/autoencoder_v2'
+checkpoint_path = 'weights/autoencoder_relu_leaky_relu'
 
 ckpt = tf.train.Checkpoint(transformer=model,
                            optimizer=optimizer)
