@@ -193,6 +193,7 @@ class Transformer(tf.keras.Model):
         enc_output = self.pooling(enc_output)
         enc_output = self.dense(enc_output)
         class_output = self.classifier(enc_output)
+        
         return class_output
 
 
