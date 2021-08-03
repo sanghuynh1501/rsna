@@ -13,8 +13,10 @@ loss_object = tf.keras.losses.MeanSquaredError()
 optimizer = tf.keras.optimizers.Adam(learning_rate=0.0002, beta_1=0.5)
 
 train_loss = tf.keras.metrics.Mean(name='train_loss')
+# train_accuracy = tf.keras.metrics.BinaryCrossentropy(name='train_accuracy')
 
 test_loss = tf.keras.metrics.Mean(name='test_loss')
+# test_accuracy = tf.keras.metrics.BinaryCrossentropy(name='test_accuracy')
 
 model = AutoEncoder()
 
@@ -31,6 +33,7 @@ def train_step(images, labels):
   optimizer.apply_gradients(zip(gradients, model.trainable_variables))
 
   train_loss(loss)
+#   train_accuracy(labels, predictions)
 
 @tf.function
 def test_step(images, labels):
@@ -40,6 +43,7 @@ def test_step(images, labels):
   t_loss = loss_object(labels, predictions)
 
   test_loss(t_loss)
+#   test_accuracy(labels, predictions)
 
 EPOCHS = 100
 
@@ -71,7 +75,9 @@ min_loss = float('inf')
 for epoch in range(EPOCHS):
     # Reset the metrics at the start of the next epoch
     train_loss.reset_states()
+    # train_accuracy.reset_states()
     test_loss.reset_states()
+    # test_accuracy.reset_states()
 
     for image, gray in train_data:
         train_step(image, gray)

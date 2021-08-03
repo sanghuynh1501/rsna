@@ -167,7 +167,6 @@ class Encoder(tf.keras.layers.Layer):
 
         # adding embedding and position encoding.
         x = self.embedding(x)  # (batch_size, input_seq_len, d_model)
-        print('x.shape ', x.shape)
         x *= tf.math.sqrt(tf.cast(self.d_model, tf.float32))
         x += self.pos_encoding[:, :seq_len, :]
 
@@ -193,9 +192,8 @@ class Transformer(tf.keras.Model):
         enc_output = self.pooling(enc_output)
         enc_output = self.dense(enc_output)
         class_output = self.classifier(enc_output)
-        
-        return class_output
 
+        return class_output
 
 class AutoEncoder(Model):
     def __init__(self):
@@ -252,11 +250,11 @@ if __name__ == "__main__":
     # feature = model.feature_extract(image)
     # print('feature.shape ', feature.shape)
 
-    num_layers = 4
-    d_model = 128
-    dff = 512
-    num_heads = 8
-    dropout_rate = 0.1
+    num_layers = 2
+    d_model = 64
+    dff = 128
+    num_heads = 4
+    dropout_rate = 0.3
 
     transformer = Transformer(
         num_layers=num_layers,
@@ -267,7 +265,7 @@ if __name__ == "__main__":
         rate=dropout_rate
     )
 
-    image = np.ones((32, 400, 512))
+    image = np.ones((32, 400, 512 * 4))
     enc_padding_mask = create_padding_mask(np.zeros((32, 400)))
     enc_output = transformer(image, False, enc_padding_mask)
     print('enc_output.shape ', enc_output.shape)

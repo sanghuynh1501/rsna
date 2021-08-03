@@ -46,7 +46,8 @@ with tqdm(total=(test_length + train_length)) as pbar:
                     else:
                         if image_stacks.shape[0] >= STACK_SIZE:
                             extract_feature_512(model, image_stacks, link_stacks)
-                            image_stacks = None
+                            image_stacks = image
+                            link_stacks = [image_path]
                         else:
                             image_stacks = np.concatenate([image_stacks, image], 0)
                             link_stacks.append(image_path)
