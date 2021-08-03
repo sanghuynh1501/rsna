@@ -3,8 +3,7 @@ import numpy as np
 
 import tensorflow as tf
 from tensorflow.keras import Model, Input
-from tensorflow.keras import layers
-from tensorflow.keras.layers import Conv2D, UpSampling2D, Reshape, Dense, LeakyReLU, Conv2DTranspose
+from tensorflow.keras.layers import Conv2D, GlobalAveragePooling1D, Reshape, Dense, LeakyReLU, Conv2DTranspose
 
 physical_devices = tf.config.list_physical_devices('GPU')
 try:
@@ -184,13 +183,17 @@ class Transformer(tf.keras.Model):
         super(Transformer, self).__init__()
 
         self.encoder = Encoder(num_layers, d_model, num_heads, dff, pe_input, rate)
+        self.pooling = GlobalAveragePooling1D()
         self.dense = Dense(64, activation='relu')
+        self.classifier = Dense(1, activation='sigmoid')
 
     def call(self, inp, training, enc_padding_mask):
 
         enc_output = self.encoder(inp, training, enc_padding_mask)  # (batch_size, inp_seq_len, d_model)
+        enc_output = self.pooling(enc_output)
         enc_output = self.dense(enc_output)
-        return enc_output
+        class_output = self.classifier(enc_output)
+        return class_output
 
 
 class AutoEncoder(Model):
