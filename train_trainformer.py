@@ -40,6 +40,19 @@ model = Transformer(
     rate=dropout_rate
 )
 
+def augment_data(X_data, y_data):
+    new_x = []
+    new_y = []
+    
+    for x, y in zip(X_data, y_data):
+        for idx in range(10):
+            new_x.append(x + '_' + str(idx))
+            new_y.append(y)
+
+    return new_x, new_y
+
+X_train, y_train = augment_data(X_train, y_train)
+
 loss_object = tf.keras.losses.BinaryCrossentropy(from_logits=False)
 optimizer = tf.keras.optimizers.Adam(learning_rate=0.0002, beta_1=0.5)
 

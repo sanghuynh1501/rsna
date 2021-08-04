@@ -2,6 +2,8 @@ import os
 import cv2
 from tqdm import tqdm
 import matplotlib.pyplot as plt
+import albumentations as A
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
 
 import random
 import numpy as np
@@ -26,9 +28,13 @@ def write_feature(images, links):
             os.makedirs(folder)
         np.save(link, image)
 
-def write_feature_512(images, links):
+def write_feature_512(images, links, isOrigin=False):
     for image, link in zip(images, links):
-        link = link.replace('feature', 'feature_512')
+        if isOrigin = True:
+            link = link.replace('origin', 'feature_512')
+            link = link.replace('.png', '.npy')
+        else
+            link = link.replace('feature', 'feature_512')
         folder = '/'.join(link.split('/')[:-1])
         if not os.path.isdir(folder):
             os.makedirs(folder)
@@ -107,9 +113,9 @@ def extract_feature(image):
     feature = np.reshape(feature, (128, -1))
     return feature
 
-def extract_feature_512(model, image_stacks, link_stacks):
+def extract_feature_512(model, image_stacks, link_stacks, isOrigin=False):
     features = model.feature_extract(image_stacks)
-    write_feature_512(features, link_stacks)
+    write_feature_512(features, link_stacks, isOrigin)
 
 def generate_image(model, images, epoch, isFull=True):
     predictions = None
@@ -129,7 +135,7 @@ def get_random_sequence(folder_link, reduce=0.8, isTest=False):
         if os.path.isdir(f"{folder_link}/{type}"):
             sequence = np.array([])
             folder = os.listdir(f"{folder_link}/{type}")
-            if not isTest:
+            if not isTest and len(folder) > 50:
                 index = round(len(folder) * reduce)
                 random_index = random.randint(index, len(folder))
                 folder = random_data(folder)[:random_index]
@@ -188,11 +194,11 @@ def sequence_generator(data_folder, sample_list, labels_list, type, batch_size=1
     # for i in range(10):
     #     yield (np.ones((batch_size, 224, 224, 3)), np.ones((batch_size, 224, 224, 1)))
     if isTest:
-        sample_list = np.tile(sample_list, 5)
-        labels_list = np.tile(labels_list, 5)
+        sample_list = np.tile(sample_list, 100)
+        labels_list = np.tile(labels_list, 100)
     else:
-        sample_list = np.tile(sample_list, 10)
-        labels_list = np.tile(labels_list, 10)
+        sample_list = np.tile(sample_list, 200)
+        labels_list = np.tile(labels_list, 200)
         sample_list, labels_list = random_datas(sample_list, labels_list)
 
     with tqdm(total=len(sample_list)) as pbar:
@@ -203,7 +209,7 @@ def sequence_generator(data_folder, sample_list, labels_list, type, batch_size=1
                 # folder_link = f'{data_folder}/{image}'
                 label = np.array([int(label)])
 
-                sequence, length = get_random_sequence(folder_link, 0.8, isTest)
+                sequence, length = get_random_sequence(folder_link, 0.5, isTest)
 
                 if sequences.shape[0] >= batch_size or idx >= len(sample_list) - 1:
                     if not isTest:
@@ -226,3 +232,53 @@ def sequence_generator(data_folder, sample_list, labels_list, type, batch_size=1
                 pass
             
             pbar.update(1)
+
+def strong_aug(object_type):
+    return A.Compose([
+            A.ShiftScaleRotate(shift_limit=0.1, scale_limit=0, rotate_limit=10, p=0.5),
+            A.RandomBrightnessContrast(brightness_limit=[-0.1, 0.2], contrast_limit=0, p=0.5),
+            A.HorizontalFlip(p=0.5),
+            A.VerticalFlip(p=0.5)
+        ],
+        additional_targets=object_type
+    )
+
+def augment_data(folder, feature, n_generated_samples):
+    for type_name in os.listdir(folder + '/' + feature):
+        for idx in range(n_generated_samples):
+
+            aug_input = {}
+            image_name = []
+            object_type = {}
+            file_path_list = {}
+
+            for id, image in enumerate(os.listdir(folder + '/' + feature + '/' + type_name)):
+                # load the image
+                file_path = folder + '/' + feature + '/' + type_name + '/' + image
+                image = cv2.imread(file_path)
+                image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+                if id == 0:
+                    aug_input['image'] = image
+                    file_path_list['image'] = file_path
+                    image_name.append('image')
+                else:
+                    aug_input['image' + str(id - 1)] = image
+                    file_path_list['image' + str(id - 1)] = file_path
+                    object_type['image' + str(id - 1)] = 'image'
+                    image_name.append('image' + str(id - 1))
+
+            aug = strong_aug(object_type)
+            augmented_data = aug(**aug_input)
+            
+            for name in image_name:
+                image = augmented_data[name]
+                image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+                file_path = file_path_list[name]
+                file_path = file_path.replace('origin', 'agument')
+                file_paths = file_path.split('/')
+                file_paths[3] = f'{feature}_{str(idx)}'
+                file_path = '/'.join(file_paths)
+                folder_name = '/'.join(file_paths[:-1])
+                if not os.path.isdir(folder_name):
+                    os.makedirs(folder_name)
+                cv2.imwrite(file_path, image)
