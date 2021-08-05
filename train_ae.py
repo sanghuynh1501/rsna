@@ -1,5 +1,5 @@
 import pickle
-from util import generate_image
+from util import augment_data, generate_image
 import cv2
 import numpy as np
 from tf_data import AutoEncoderDataset
@@ -21,6 +21,7 @@ test_loss = tf.keras.metrics.Mean(name='test_loss')
 model = AutoEncoder()
 
 DATA_ORIGIN_TRAIN = 'data/origin/train'
+DATA_AUGMENT_TRAIN = 'data/agument/train'
 
 @tf.function
 def train_step(images, labels):
@@ -55,11 +56,21 @@ with open('pickle/X_test.pkl', 'rb') as f:
     X_test = pickle.load(f)
     f.close()
 
+with open('pickle/y_train.pkl', 'rb') as f:
+    y_train = pickle.load(f)
+    f.close()
+
+with open('pickle/y_test.pkl', 'rb') as f:
+    y_test = pickle.load(f)
+    f.close()
+
+X_train, _ = augment_data(X_train, y_train)
+
 batch_size = 32
-train_data = AutoEncoderDataset(DATA_ORIGIN_TRAIN, X_train, batch_size).prefetch(tf.data.AUTOTUNE)
+train_data = AutoEncoderDataset(DATA_AUGMENT_TRAIN, X_train, batch_size).prefetch(tf.data.AUTOTUNE)
 test_data = AutoEncoderDataset(DATA_ORIGIN_TRAIN, X_test, batch_size).prefetch(tf.data.AUTOTUNE)
 
-checkpoint_path = 'weights/autoencoder_relu_leaky_relu'
+checkpoint_path = 'weights/autoencoder_relu_leaky_relu_v2'
 
 ckpt = tf.train.Checkpoint(transformer=model,
                            optimizer=optimizer)

@@ -21,7 +21,7 @@ def create_padding_mask(seq):
 
 def write_feature(images, links):
     for image, link in zip(images, links):
-        link = link.replace('origin', 'feature')
+        link = link.replace('data/agument', '/media/sang/b2f3b20a-1ca2-4225-990d-8459f5a80739/feature')
         link = link.replace('.png', '.npy')
         folder = '/'.join(link.split('/')[:-1])
         if not os.path.isdir(folder):
@@ -30,10 +30,11 @@ def write_feature(images, links):
 
 def write_feature_512(images, links, isOrigin=False):
     for image, link in zip(images, links):
-        if isOrigin = True:
-            link = link.replace('origin', 'feature_512')
+        if isOrigin == True:
+            # link = link.replace('origin', 'feature_512_origin')
+            link = link.replace('data/origin/train', 'data/test_origin')
             link = link.replace('.png', '.npy')
-        else
+        else:
             link = link.replace('feature', 'feature_512')
         folder = '/'.join(link.split('/')[:-1])
         if not os.path.isdir(folder):
@@ -117,17 +118,22 @@ def extract_feature_512(model, image_stacks, link_stacks, isOrigin=False):
     features = model.feature_extract(image_stacks)
     write_feature_512(features, link_stacks, isOrigin)
 
-def generate_image(model, images, epoch, isFull=True):
+def generate_image(model, images, links, epoch, isFull=True):
     predictions = None
     if isFull:
         predictions = model(images, training=False)
     else:
         predictions = model.image_generate(images)
-    for idx, image in enumerate(predictions):
+    for idx, (image, link) in enumerate(zip(predictions, links)):
         image = np.reshape(image, (32, 32))
         image = (image * 127.5) + 127.5
         image = image.astype(np.int32)
-        cv2.imwrite(f'images/image_{epoch}_{idx}.png', image)
+        link = link.replace('test_origin', 'image_test')
+        file_paths = link.split('/')
+        folder_name = '/'.join(file_paths[:-1])
+        if not os.path.isdir(folder_name):
+            os.makedirs(folder_name)
+        cv2.imwrite(f'{folder_name}/image_{epoch}_{idx}.png', image)
 
 def get_random_sequence(folder_link, reduce=0.8, isTest=False):
     sequences = np.array([])
@@ -193,12 +199,13 @@ def sequence_generator(data_folder, sample_list, labels_list, type, batch_size=1
     lengths = np.array([])
     # for i in range(10):
     #     yield (np.ones((batch_size, 224, 224, 3)), np.ones((batch_size, 224, 224, 1)))
-    if isTest:
-        sample_list = np.tile(sample_list, 100)
-        labels_list = np.tile(labels_list, 100)
-    else:
-        sample_list = np.tile(sample_list, 200)
-        labels_list = np.tile(labels_list, 200)
+    # if isTest:
+    #     sample_list = np.tile(sample_list, 10)
+    #     labels_list = np.tile(labels_list, 10)
+    # else:
+    #     sample_list = np.tile(sample_list, 20)
+    #     labels_list = np.tile(labels_list, 20)
+    if not isTest:
         sample_list, labels_list = random_datas(sample_list, labels_list)
 
     with tqdm(total=len(sample_list)) as pbar:
@@ -209,7 +216,7 @@ def sequence_generator(data_folder, sample_list, labels_list, type, batch_size=1
                 # folder_link = f'{data_folder}/{image}'
                 label = np.array([int(label)])
 
-                sequence, length = get_random_sequence(folder_link, 0.5, isTest)
+                sequence, length = get_random_sequence(folder_link, 0.9, isTest)
 
                 if sequences.shape[0] >= batch_size or idx >= len(sample_list) - 1:
                     if not isTest:
@@ -235,10 +242,10 @@ def sequence_generator(data_folder, sample_list, labels_list, type, batch_size=1
 
 def strong_aug(object_type):
     return A.Compose([
+            A.RandomScale(scale_limit=0.1, p=0.5),
             A.ShiftScaleRotate(shift_limit=0.1, scale_limit=0, rotate_limit=10, p=0.5),
             A.RandomBrightnessContrast(brightness_limit=[-0.1, 0.2], contrast_limit=0, p=0.5),
-            A.HorizontalFlip(p=0.5),
-            A.VerticalFlip(p=0.5)
+            A.HorizontalFlip(p=0.5)
         ],
         additional_targets=object_type
     )
@@ -282,3 +289,14 @@ def augment_data(folder, feature, n_generated_samples):
                 if not os.path.isdir(folder_name):
                     os.makedirs(folder_name)
                 cv2.imwrite(file_path, image)
+
+def augment_data(X_data, y_data):
+    new_x = []
+    new_y = []
+    
+    for x, y in zip(X_data, y_data):
+        for idx in range(10):
+            new_x.append(x + '_' + str(idx))
+            new_y.append(y)
+
+    return new_x, new_y

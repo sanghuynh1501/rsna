@@ -7,8 +7,7 @@ import numpy as np
 import tensorflow as tf
 
 STACK_SIZE = 128
-DATA_ORIGIN = 'data/origin'
-DATA_FEATURE = 'data/feature'
+DATA_ORIGIN = 'data/agument'
 
 physical_devices = tf.config.list_physical_devices('GPU')
 try:

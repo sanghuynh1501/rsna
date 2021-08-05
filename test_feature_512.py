@@ -7,7 +7,7 @@ import tensorflow as tf
 from models import AutoEncoder
 
 STACK_SIZE = 256
-DATA_FEATURE = 'data/feature_512'
+DATA_FEATURE = 'data/test_origin'
 
 model = AutoEncoder()
 
@@ -25,8 +25,15 @@ if ckpt_manager.latest_checkpoint:
     print('Latest checkpoint restored!!')
 
 data = os.listdir(DATA_FEATURE)
-test_length = len(os.listdir(DATA_FEATURE + '/' + 'test'))
-train_length = len(os.listdir(DATA_FEATURE + '/' + 'train'))
+
+test_length = 0
+train_length = 0
+
+if os.path.isdir(DATA_FEATURE + '/' + 'test') is True:
+    test_length = len(os.listdir(DATA_FEATURE + '/' + 'test'))
+
+if os.path.isdir(DATA_FEATURE + '/' + 'train') is True:
+    train_length = len(os.listdir(DATA_FEATURE + '/' + 'train'))
 
 image_stacks = None
 link_stacks = []
@@ -54,7 +61,7 @@ with tqdm(total=(test_length + train_length)) as pbar:
                         link_stacks = [image_path]
                     else:
                         if image_stacks.shape[0] >= STACK_SIZE:
-                            generate_image(model, image_stacks[:5], dem, isFull=False)
+                            generate_image(model, image_stacks, link_stacks, dem, isFull=False)
                             image_stacks = None
                             dem += 1
                         else:

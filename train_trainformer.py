@@ -1,5 +1,5 @@
 import pickle
-from util import generate_image, sequence_generator
+from util import augment_data, generate_image, sequence_generator
 from tf_data import TransformerDataset
 from models import Transformer
 import tensorflow as tf
@@ -8,6 +8,7 @@ from tensorflow.keras.layers import Dense, Flatten, Conv2D
 from tensorflow.keras import Model
 
 DATA_FEATURE_TRAIN = 'data/feature_512/train'
+DATA_FEATURE_TEST = 'data/test_origin/test'
 
 with open('pickle/X_train.pkl', 'rb') as f:
     X_train = pickle.load(f)
@@ -40,17 +41,6 @@ model = Transformer(
     rate=dropout_rate
 )
 
-def augment_data(X_data, y_data):
-    new_x = []
-    new_y = []
-    
-    for x, y in zip(X_data, y_data):
-        for idx in range(10):
-            new_x.append(x + '_' + str(idx))
-            new_y.append(y)
-
-    return new_x, new_y
-
 X_train, y_train = augment_data(X_train, y_train)
 
 loss_object = tf.keras.losses.BinaryCrossentropy(from_logits=False)
@@ -66,7 +56,7 @@ test_auc = tf.keras.metrics.AUC()
 
 batch_size = 32
 train_data = TransformerDataset(DATA_FEATURE_TRAIN, X_train, y_train, 'FLAIR', batch_size, False).prefetch(tf.data.AUTOTUNE)
-test_data = TransformerDataset(DATA_FEATURE_TRAIN, X_test, y_test, 'FLAIR', batch_size, True).prefetch(tf.data.AUTOTUNE)
+test_data = TransformerDataset(DATA_FEATURE_TEST, X_test, y_test, 'FLAIR', batch_size, True).prefetch(tf.data.AUTOTUNE)
 
 def train_step(images, masks, labels):
   with tf.GradientTape() as tape:
