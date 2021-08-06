@@ -1,11 +1,8 @@
 import pickle
 from util import augment_data, augment_data_split, generate_image, sequence_generator
 from tf_data import TransformerDataset
-from models import CNN_Classifier, LSTM_Classifier, Transformer
+from models import CNN_Classifier
 import tensorflow as tf
-
-from tensorflow.keras.layers import Dense, Flatten, Conv2D
-from tensorflow.keras import Model
 
 DATA_FEATURE_TRAIN = 'data/feature_512/train'
 DATA_FEATURE_TEST = 'data/feature_512/train'
@@ -26,12 +23,6 @@ with open('pickle/y_test.pkl', 'rb') as f:
     y_test = pickle.load(f)
     f.close()
 
-num_layers = 2
-d_model = 64
-dff = 128
-num_heads = 4
-dropout_rate = 0.3
-
 model = CNN_Classifier()
 
 X_train, y_train = augment_data_split(X_train, y_train)
@@ -49,8 +40,8 @@ test_loss = tf.keras.metrics.Mean(name='test_loss')
 test_auc = tf.keras.metrics.AUC()
 
 batch_size = 32
-train_data = TransformerDataset(DATA_FEATURE_TRAIN, X_train, y_train, 'FLAIR', batch_size, False).prefetch(tf.data.AUTOTUNE)
-test_data = TransformerDataset(DATA_FEATURE_TEST, X_test, y_test, 'FLAIR', batch_size, True).prefetch(tf.data.AUTOTUNE)
+train_data = TransformerDataset(DATA_FEATURE_TRAIN, X_train, y_train, batch_size, False).prefetch(tf.data.AUTOTUNE)
+test_data = TransformerDataset(DATA_FEATURE_TEST, X_test, y_test, batch_size, True).prefetch(tf.data.AUTOTUNE)
 
 def train_step(images, labels):
     with tf.GradientTape() as tape:

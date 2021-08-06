@@ -7,7 +7,8 @@ import numpy as np
 import tensorflow as tf
 
 STACK_SIZE = 128
-DATA_ORIGIN = 'data/agument'
+DATA_ORIGIN = 'data/origin'
+DATA_OUTPUT = 'data/feature'
 
 physical_devices = tf.config.list_physical_devices('GPU')
 try:
@@ -34,7 +35,7 @@ with tqdm(total=(test_length + train_length)) as pbar:
                     else:
                         if image_stacks.shape[0] >= STACK_SIZE:
                             features = extract_feature(image_stacks)
-                            write_feature(features, link_stacks)
+                            write_feature(features, link_stacks, DATA_ORIGIN, DATA_OUTPUT)
                             image_stacks = image
                             link_stacks = [image_path]
                         else:

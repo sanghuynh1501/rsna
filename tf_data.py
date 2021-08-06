@@ -27,14 +27,14 @@ class AutoEncoderDataset(tf.data.Dataset):
         return data
 
 class TransformerDataset(tf.data.Dataset):
-    def __new__(self, folder, samples, labels, type, batch_size, isTest=False):
+    def __new__(self, folder, samples, labels, batch_size, isTest=False):
         data = tf.data.Dataset.from_generator(
             sequence_generator,
             output_signature = (
-                tf.TensorSpec(shape = (None, 40, 512), dtype = tf.float32),
+                tf.TensorSpec(shape = (None, 80, 512), dtype = tf.float32),
                 tf.TensorSpec(shape = (None), dtype = tf.float32),
             ),
-            args=(folder, samples, labels, type, batch_size, isTest)
+            args=(folder, samples, labels, batch_size, isTest)
         )
         return data
 

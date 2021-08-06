@@ -10,6 +10,7 @@ from models import AutoEncoder
 
 STACK_SIZE = 128
 DATA_ORIGIN = 'data/origin'
+DATA_FEATURE = 'data/feature_512'
 
 model = AutoEncoder()
 
@@ -53,7 +54,7 @@ with tqdm(total=(test_length + train_length)) as pbar:
                         if image_stacks.shape[0] >= STACK_SIZE:
                             features = extract_feature(image_stacks)
                             # write_feature(features, link_stacks)
-                            extract_feature_512(model, features, link_stacks, True)
+                            extract_feature_512(model, features, link_stacks, DATA_ORIGIN, DATA_FEATURE, True)
                             image_stacks = image
                             link_stacks = [image_path]
                         else:

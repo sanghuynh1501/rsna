@@ -16,6 +16,7 @@ with open('pickle/X_test.pkl', 'rb') as f:
 
 STACK_SIZE = 128
 DATA_ORIGIN = 'data/origin/train'
+DATA_TEST='data/origin/test'
 
 model = AutoEncoder()
 
@@ -54,8 +55,7 @@ with tqdm(total=len(X_test)) as pbar:
                 else:
                     if image_stacks.shape[0] >= STACK_SIZE:
                         features = extract_feature(image_stacks)
-                        # write_feature(features, link_stacks)
-                        extract_feature_512(model, features, link_stacks, True)
+                        extract_feature_512(model, features, link_stacks, DATA_ORIGIN, DATA_TEST, True)
                         image_stacks = image
                         link_stacks = [image_path]
                     else:

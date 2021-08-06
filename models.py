@@ -221,8 +221,7 @@ class LSTM_Classifier(tf.keras.Model):
 
 def CNN_Classifier():
     model = tf.keras.Sequential()
-    model.add(GRU(64))
-    model.add(Dropout(0.3))
+    model.add(Flatten())
     model.add(Dense(1, activation='sigmoid'))
 
     return model

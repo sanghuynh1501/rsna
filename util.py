@@ -19,23 +19,20 @@ def create_padding_mask(seq):
     # to the attention logits.
     return seq[:, tf.newaxis, tf.newaxis, :]
 
-def write_feature(images, links):
+def write_feature(images, links, input_folder, output_folder):
     for image, link in zip(images, links):
-        link = link.replace('data/agument', '/media/sang/b2f3b20a-1ca2-4225-990d-8459f5a80739/feature')
+        link = link.replace(input_folder, output_folder)
         link = link.replace('.png', '.npy')
         folder = '/'.join(link.split('/')[:-1])
         if not os.path.isdir(folder):
             os.makedirs(folder)
         np.save(link, image)
 
-def write_feature_512(images, links, isOrigin=False):
+def write_feature_512(images, links, input_folder, output_folder, isOrigin=False):
     for image, link in zip(images, links):
+        link = link.replace(input_folder, output_folder)
         if isOrigin == True:
-            # link = link.replace('origin', 'feature_512_origin')
-            link = link.replace('data/origin/train', 'data/test_origin')
             link = link.replace('.png', '.npy')
-        else:
-            link = link.replace('feature', 'feature_512')
         folder = '/'.join(link.split('/')[:-1])
         if not os.path.isdir(folder):
             os.makedirs(folder)
@@ -114,9 +111,9 @@ def extract_feature(image):
     feature = np.reshape(feature, (128, -1))
     return feature
 
-def extract_feature_512(model, image_stacks, link_stacks, isOrigin=False):
+def extract_feature_512(model,image_stacks, link_stacks, input_folder, output_folder, isOrigin=False):
     features = model.feature_extract(image_stacks)
-    write_feature_512(features, link_stacks, isOrigin)
+    write_feature_512(features, link_stacks, input_folder, output_folder, isOrigin)
 
 def generate_image(model, images, links, epoch, isFull=True):
     predictions = None
@@ -135,30 +132,27 @@ def generate_image(model, images, links, epoch, isFull=True):
             os.makedirs(folder_name)
         cv2.imwrite(f'{folder_name}/image_{epoch}_{idx}.png', image)
 
-def get_random_sequence(folder_link, reduce=0.8, isTest=False):
+def get_random_sequence(folder_link, isTest=False):
     sequences = np.array([])
     types = ['FLAIR', 'T1w', 'T1wCE', 'T2w']
-    # random.shuffle(types)
+    
     isOrder = bool(random.getrandbits(1))
     for type in types:
         sequence = np.array([])
         if os.path.isdir(f"{folder_link}/{type}"):
+
             folder = os.listdir(f"{folder_link}/{type}")
+            
             if isOrder or isTest:
                 folder.sort(key=lambda x: int(x.replace('.', '-').split('-')[1]))
             else:
                 folder.sort(key=lambda x: int(x.replace('.', '-').split('-')[1]), reverse=True)
-            # print('==========================================================')
-            # print('folder ', folder)
-            # if not isTest and len(folder) > 50:
-            #     index = round(len(folder) * reduce)
-            #     random_index = random.randint(index, len(folder))
-            #     folder = random_data(folder)[:random_index]
-            start = len(folder) // 2 - 5
-            end = len(folder) // 2 + 5
+
+            start = len(folder) // 2 - 10
+            end = len(folder) // 2 + 10
             if start < 0:
                 start = 0
-                end = start + 10
+                end = start + 20
 
             for image in folder[start: end]:
                 image = np.load(f"{folder_link}/{type}/{image}")
@@ -167,28 +161,25 @@ def get_random_sequence(folder_link, reduce=0.8, isTest=False):
                     sequence = image
                 else:
                     sequence = np.concatenate([sequence, image], 0)
-
-            # sequence = padding_data(sequence, max_len=300)
-            # sequence = np.expand_dims(sequence, -1)
         else:
-            sequence = np.array((10, 512))
+            sequence = np.array((20, 512))
+        
+        sequence  = padding_data(sequence, 20)
 
         if sequences.shape[0] == 0:
             sequences = sequence
         else:
             sequences = np.concatenate([sequences, sequence], 0)
     
-    # print('sequences ', sequences.shape)
-    length = np.array([len(sequences)])
-    # sequences = padding_data(sequences)
     sequences = np.expand_dims(sequences, 0)
-    return sequences, length
+
+    return sequences
 
 def image_generator(data_folder, sample_list, batch_size=128):
+    
     images = np.array([])
     grays = np.array([])
-    # for i in range(10):
-    #     yield (np.ones((batch_size, 224, 224, 3)), np.ones((batch_size, 224, 224, 1)))
+
     with tqdm(total=len(sample_list)) as pbar:
         for sample in random_data(sample_list):
             # Reading data (line, record) from the file
@@ -215,49 +206,35 @@ def image_generator(data_folder, sample_list, batch_size=128):
                         pass
             pbar.update(1)
 
-def sequence_generator(data_folder, sample_list, labels_list, type, batch_size=128, isTest=False):
+def sequence_generator(data_folder, sample_list, labels_list, batch_size=128, isTest=False):
+
     sequences = np.array([])
     labels = np.array([])
-    # lengths = np.array([])
-    # for i in range(10):
-    #     yield (np.ones((batch_size, 224, 224, 3)), np.ones((batch_size, 224, 224, 1)))
-    # if isTest:
-    #     sample_list = np.tile(sample_list, 10)
-    #     labels_list = np.tile(labels_list, 10)
-    # else:
-    #     sample_list = np.tile(sample_list, 10)
-    #     labels_list = np.tile(labels_list, 10)
 
     sample_list, labels_list = random_datas(sample_list, labels_list)
 
     with tqdm(total=len(sample_list)) as pbar:
         for idx, (image, label) in enumerate(zip(sample_list, labels_list)):
             try:
-                # Reading data (line, record) from the file
+
                 folder_link = f"{data_folder.decode('utf8')}/{image.decode('utf8')}"
-                # folder_link = f'{data_folder}/{image}'
                 label = np.array([int(label)])
 
-                sequence, _ = get_random_sequence(folder_link, 0.85, isTest)
+                sequence = get_random_sequence(folder_link, isTest)
 
                 if sequences.shape[0] >= batch_size or idx >= len(sample_list) - 1:
-                    if not isTest:
-                        # sequences, lengths, labels = random_datas_three(sequences, lengths, labels)
-                        sequences, labels = random_datas(sequences, labels)
-                    # sequences, masks = clip_data(sequences, lengths)
+                    # if not isTest:
+                    #     sequences, labels = random_datas(sequences, labels)
                     yield sequences, labels
                     sequences = sequence
                     labels = label
-                    # lengths = length
                 else:
                     if sequences.shape[0] == 0:
                         sequences = sequence
                         labels = label
-                        # lengths = length
                     else:
                         sequences = np.concatenate([sequences, sequence], 0)
                         labels = np.concatenate([labels, label], 0)
-                        # lengths = np.concatenate([lengths, length], 0)
             except:
                 pass
             
@@ -273,7 +250,7 @@ def strong_aug(object_type):
         additional_targets=object_type
     )
 
-def augment_data(folder, feature, n_generated_samples):
+def augment_data(folder, feature, n_generated_samples, input_folder, output_folder):
     for type_name in os.listdir(folder + '/' + feature):
         for idx in range(n_generated_samples + 1, 50, 1):
 
@@ -305,7 +282,7 @@ def augment_data(folder, feature, n_generated_samples):
                 image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
                 image = cv2.resize(image, (224, 224))
                 file_path = file_path_list[name]
-                file_path = file_path.replace('data/origin', '/media/sang/b2f3b20a-1ca2-4225-990d-8459f5a80739/augment_50')
+                file_path = file_path.replace(input_folder, output_folder)
                 file_paths = file_path.split('/')
                 file_paths[6] = f'{feature}_{str(idx)}'
                 file_path = '/'.join(file_paths)
