@@ -1,14 +1,14 @@
 import pickle
-from util import augment_data, generate_image, sequence_generator
+from util import augment_data, augment_data_split, generate_image, sequence_generator
 from tf_data import TransformerDataset
-from models import Transformer
+from models import CNN_Classifier, LSTM_Classifier, Transformer
 import tensorflow as tf
 
 from tensorflow.keras.layers import Dense, Flatten, Conv2D
 from tensorflow.keras import Model
 
 DATA_FEATURE_TRAIN = 'data/feature_512/train'
-DATA_FEATURE_TEST = 'data/test_origin/test'
+DATA_FEATURE_TEST = 'data/feature_512/train'
 
 with open('pickle/X_train.pkl', 'rb') as f:
     X_train = pickle.load(f)
@@ -32,16 +32,10 @@ dff = 128
 num_heads = 4
 dropout_rate = 0.3
 
-model = Transformer(
-    num_layers=num_layers,
-    d_model=d_model,
-    num_heads=num_heads,
-    dff=dff,
-    pe_input=1000,
-    rate=dropout_rate
-)
+model = CNN_Classifier()
 
-X_train, y_train = augment_data(X_train, y_train)
+X_train, y_train = augment_data_split(X_train, y_train)
+X_test, y_test = augment_data_split(X_test, y_test)
 
 loss_object = tf.keras.losses.BinaryCrossentropy(from_logits=False)
 optimizer = tf.keras.optimizers.Adam(learning_rate=0.0002, beta_1=0.5)
@@ -58,28 +52,28 @@ batch_size = 32
 train_data = TransformerDataset(DATA_FEATURE_TRAIN, X_train, y_train, 'FLAIR', batch_size, False).prefetch(tf.data.AUTOTUNE)
 test_data = TransformerDataset(DATA_FEATURE_TEST, X_test, y_test, 'FLAIR', batch_size, True).prefetch(tf.data.AUTOTUNE)
 
-def train_step(images, masks, labels):
-  with tf.GradientTape() as tape:
-    # training=True is only needed if there are layers with different
+def train_step(images, labels):
+    with tf.GradientTape() as tape:
+        # training=True is only needed if there are layers with different
+        # behavior during training versus inference (e.g. Dropout).
+        predictions = model(images, training=True)
+        loss = loss_object(labels, predictions)
+    gradients = tape.gradient(loss, model.trainable_variables)
+    optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+
+    train_loss(loss)
+    train_auc(labels, predictions)
+
+def test_step(images, labels):
+    # training=False is only needed if there are layers with different
     # behavior during training versus inference (e.g. Dropout).
-    predictions = model(images, True, masks)
-    loss = loss_object(labels, predictions)
-  gradients = tape.gradient(loss, model.trainable_variables)
-  optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+    predictions = model(images, training=False)
+    t_loss = loss_object(labels, predictions)
 
-  train_loss(loss)
-  train_auc(labels, predictions)
+    test_loss(t_loss)
+    test_auc(labels, predictions)
 
-def test_step(images, masks, labels):
-  # training=False is only needed if there are layers with different
-  # behavior during training versus inference (e.g. Dropout).
-  predictions = model(images, False, masks)
-  t_loss = loss_object(labels, predictions)
-
-  test_loss(t_loss)
-  test_auc(labels, predictions)
-
-checkpoint_path = 'weights/transformer'
+checkpoint_path = 'weights/lstm'
 
 ckpt = tf.train.Checkpoint(transformer=model,
                            optimizer=optimizer)
@@ -101,11 +95,11 @@ for epoch in range(EPOCHS):
     test_loss.reset_states()
     test_auc.reset_states()
 
-    for image, mask, label in train_data:
-        train_step(image, mask, label)
+    for image, label in train_data:
+        train_step(image, label)
 
-    for image, mask, labe in test_data:
-        test_step(image, mask, labe)
+    for image, labe in test_data:
+        test_step(image, labe)
 
     if test_loss.result() < min_loss:
         ckpt_save_path = ckpt_manager.save()

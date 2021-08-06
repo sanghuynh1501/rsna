@@ -31,8 +31,7 @@ class TransformerDataset(tf.data.Dataset):
         data = tf.data.Dataset.from_generator(
             sequence_generator,
             output_signature = (
-                tf.TensorSpec(shape = (None, None, 512), dtype = tf.float32),
-                tf.TensorSpec(shape = (None, 1, 1, None), dtype = tf.float32),
+                tf.TensorSpec(shape = (None, 40, 512), dtype = tf.float32),
                 tf.TensorSpec(shape = (None), dtype = tf.float32),
             ),
             args=(folder, samples, labels, type, batch_size, isTest)

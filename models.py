@@ -1,9 +1,12 @@
+from tensorflow.python.keras import activations
+from tensorflow.python.keras.engine import training
+from tensorflow.python.keras.layers.core import Flatten
 from util import create_padding_mask
 import numpy as np
 
 import tensorflow as tf
 from tensorflow.keras import Model, Input
-from tensorflow.keras.layers import Conv2D, GlobalAveragePooling1D, Reshape, Dense, LeakyReLU, Conv2DTranspose
+from tensorflow.keras.layers import Conv2D, GlobalAveragePooling1D, Reshape, Dense, LeakyReLU, Conv2DTranspose, GRU, Dropout
 
 physical_devices = tf.config.list_physical_devices('GPU')
 try:
@@ -195,6 +198,35 @@ class Transformer(tf.keras.Model):
 
         return class_output
 
+class LSTM_Classifier(tf.keras.Model):
+    def __init__(self):
+        super(LSTM_Classifier, self).__init__()
+
+        self.reduce = Dense(128, activation='relu')
+        # self.lstm0 = LSTM(128, return_sequences=True)
+        self.lstm1 = GRU(64, return_sequences=True)
+        self.pooling = GlobalAveragePooling1D()
+        self.dense = Dense(64, activation='relu')
+        self.classifier = Dense(1, activation='sigmoid')
+
+    def call(self, inp):
+        enc_output = self.reduce(inp)
+        # enc_output = self.lstm0(enc_output)  # (batch_size, inp_seq_len, d_model)
+        enc_output = self.lstm1(enc_output)
+        enc_output = self.pooling(enc_output)
+        enc_output = self.dense(enc_output)
+        class_output = self.classifier(enc_output)
+
+        return class_output
+
+def CNN_Classifier():
+    model = tf.keras.Sequential()
+    model.add(GRU(64))
+    model.add(Dropout(0.3))
+    model.add(Dense(1, activation='sigmoid'))
+
+    return model
+
 class AutoEncoder(Model):
     def __init__(self):
         super(AutoEncoder, self).__init__()
@@ -256,18 +288,10 @@ if __name__ == "__main__":
     num_heads = 4
     dropout_rate = 0.3
 
-    transformer = Transformer(
-        num_layers=num_layers,
-        d_model=d_model,
-        num_heads=num_heads,
-        dff=dff,
-        pe_input=1000,
-        rate=dropout_rate
-    )
+    transformer = CNN_Classifier()
 
-    image = np.ones((32, 400, 512 * 4))
-    enc_padding_mask = create_padding_mask(np.zeros((32, 400)))
-    enc_output = transformer(image, False, enc_padding_mask)
+    image = np.ones((32, 300, 512, 4))
+    enc_output = transformer(image, training=False)
     print('enc_output.shape ', enc_output.shape)
 
     # temp_input = tf.random.uniform((64, 38), dtype=tf.int64, minval=0, maxval=200)

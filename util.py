@@ -137,28 +137,50 @@ def generate_image(model, images, links, epoch, isFull=True):
 
 def get_random_sequence(folder_link, reduce=0.8, isTest=False):
     sequences = np.array([])
-    for type in ['FLAIR', 'T1w', 'T2w']:
+    types = ['FLAIR', 'T1w', 'T1wCE', 'T2w']
+    # random.shuffle(types)
+    isOrder = bool(random.getrandbits(1))
+    for type in types:
+        sequence = np.array([])
         if os.path.isdir(f"{folder_link}/{type}"):
-            sequence = np.array([])
             folder = os.listdir(f"{folder_link}/{type}")
-            if not isTest and len(folder) > 50:
-                index = round(len(folder) * reduce)
-                random_index = random.randint(index, len(folder))
-                folder = random_data(folder)[:random_index]
-            for image in folder:
+            if isOrder or isTest:
+                folder.sort(key=lambda x: int(x.replace('.', '-').split('-')[1]))
+            else:
+                folder.sort(key=lambda x: int(x.replace('.', '-').split('-')[1]), reverse=True)
+            # print('==========================================================')
+            # print('folder ', folder)
+            # if not isTest and len(folder) > 50:
+            #     index = round(len(folder) * reduce)
+            #     random_index = random.randint(index, len(folder))
+            #     folder = random_data(folder)[:random_index]
+            start = len(folder) // 2 - 5
+            end = len(folder) // 2 + 5
+            if start < 0:
+                start = 0
+                end = start + 10
+
+            for image in folder[start: end]:
                 image = np.load(f"{folder_link}/{type}/{image}")
                 image = np.expand_dims(image, 0)
                 if len(sequence) == 0:
                     sequence = image
                 else:
                     sequence = np.concatenate([sequence, image], 0)
-            if sequences.shape[0] == 0:
-                sequences = sequence
-            else:
-                sequences = np.concatenate([sequences, sequence], 0)
-        
+
+            # sequence = padding_data(sequence, max_len=300)
+            # sequence = np.expand_dims(sequence, -1)
+        else:
+            sequence = np.array((10, 512))
+
+        if sequences.shape[0] == 0:
+            sequences = sequence
+        else:
+            sequences = np.concatenate([sequences, sequence], 0)
+    
+    # print('sequences ', sequences.shape)
     length = np.array([len(sequences)])
-    sequences = padding_data(sequences)
+    # sequences = padding_data(sequences)
     sequences = np.expand_dims(sequences, 0)
     return sequences, length
 
@@ -196,17 +218,17 @@ def image_generator(data_folder, sample_list, batch_size=128):
 def sequence_generator(data_folder, sample_list, labels_list, type, batch_size=128, isTest=False):
     sequences = np.array([])
     labels = np.array([])
-    lengths = np.array([])
+    # lengths = np.array([])
     # for i in range(10):
     #     yield (np.ones((batch_size, 224, 224, 3)), np.ones((batch_size, 224, 224, 1)))
     # if isTest:
     #     sample_list = np.tile(sample_list, 10)
     #     labels_list = np.tile(labels_list, 10)
     # else:
-    #     sample_list = np.tile(sample_list, 20)
-    #     labels_list = np.tile(labels_list, 20)
-    if not isTest:
-        sample_list, labels_list = random_datas(sample_list, labels_list)
+    #     sample_list = np.tile(sample_list, 10)
+    #     labels_list = np.tile(labels_list, 10)
+
+    sample_list, labels_list = random_datas(sample_list, labels_list)
 
     with tqdm(total=len(sample_list)) as pbar:
         for idx, (image, label) in enumerate(zip(sample_list, labels_list)):
@@ -216,25 +238,26 @@ def sequence_generator(data_folder, sample_list, labels_list, type, batch_size=1
                 # folder_link = f'{data_folder}/{image}'
                 label = np.array([int(label)])
 
-                sequence, length = get_random_sequence(folder_link, 0.9, isTest)
+                sequence, _ = get_random_sequence(folder_link, 0.85, isTest)
 
                 if sequences.shape[0] >= batch_size or idx >= len(sample_list) - 1:
                     if not isTest:
-                        sequences, lengths, labels = random_datas_three(sequences, lengths, labels)
-                    sequences, masks = clip_data(sequences, lengths)
-                    yield sequences, masks, labels
+                        # sequences, lengths, labels = random_datas_three(sequences, lengths, labels)
+                        sequences, labels = random_datas(sequences, labels)
+                    # sequences, masks = clip_data(sequences, lengths)
+                    yield sequences, labels
                     sequences = sequence
                     labels = label
-                    lengths = length
+                    # lengths = length
                 else:
                     if sequences.shape[0] == 0:
                         sequences = sequence
                         labels = label
-                        lengths = length
+                        # lengths = length
                     else:
                         sequences = np.concatenate([sequences, sequence], 0)
                         labels = np.concatenate([labels, label], 0)
-                        lengths = np.concatenate([lengths, length], 0)
+                        # lengths = np.concatenate([lengths, length], 0)
             except:
                 pass
             
@@ -252,7 +275,7 @@ def strong_aug(object_type):
 
 def augment_data(folder, feature, n_generated_samples):
     for type_name in os.listdir(folder + '/' + feature):
-        for idx in range(n_generated_samples):
+        for idx in range(n_generated_samples + 1, 50, 1):
 
             aug_input = {}
             image_name = []
@@ -280,17 +303,19 @@ def augment_data(folder, feature, n_generated_samples):
             for name in image_name:
                 image = augmented_data[name]
                 image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+                image = cv2.resize(image, (224, 224))
                 file_path = file_path_list[name]
-                file_path = file_path.replace('origin', 'agument')
+                file_path = file_path.replace('data/origin', '/media/sang/b2f3b20a-1ca2-4225-990d-8459f5a80739/augment_50')
                 file_paths = file_path.split('/')
-                file_paths[3] = f'{feature}_{str(idx)}'
+                file_paths[6] = f'{feature}_{str(idx)}'
                 file_path = '/'.join(file_paths)
                 folder_name = '/'.join(file_paths[:-1])
                 if not os.path.isdir(folder_name):
                     os.makedirs(folder_name)
-                cv2.imwrite(file_path, image)
+                if not os.path.isfile(file_path):
+                    cv2.imwrite(file_path, image)
 
-def augment_data(X_data, y_data):
+def augment_data_split(X_data, y_data):
     new_x = []
     new_y = []
     
