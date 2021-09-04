@@ -25,8 +25,8 @@ with open('pickle/y_test.pkl', 'rb') as f:
 
 model = CNN_Classifier()
 
-X_train, y_train = augment_data_split(X_train, y_train)
-X_test, y_test = augment_data_split(X_test, y_test)
+# X_train, y_train = augment_data_split(X_train, y_train)
+# X_test, y_test = augment_data_split(X_test, y_test)
 
 loss_object = tf.keras.losses.BinaryCrossentropy(from_logits=False)
 optimizer = tf.keras.optimizers.Adam(learning_rate=0.0002, beta_1=0.5)

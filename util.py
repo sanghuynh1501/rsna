@@ -148,11 +148,11 @@ def get_random_sequence(folder_link, isTest=False):
             else:
                 folder.sort(key=lambda x: int(x.replace('.', '-').split('-')[1]), reverse=True)
 
-            start = len(folder) // 2 - 10
-            end = len(folder) // 2 + 10
+            start = len(folder) // 2 - 15
+            end = len(folder) // 2 + 15
             if start < 0:
                 start = 0
-                end = start + 20
+                end = start + 30
 
             for image in folder[start: end]:
                 image = np.load(f"{folder_link}/{type}/{image}")
@@ -162,9 +162,9 @@ def get_random_sequence(folder_link, isTest=False):
                 else:
                     sequence = np.concatenate([sequence, image], 0)
         else:
-            sequence = np.array((20, 512))
+            sequence = np.array((30, 512))
         
-        sequence  = padding_data(sequence, 20)
+        sequence  = padding_data(sequence, 30)
 
         if sequences.shape[0] == 0:
             sequences = sequence
@@ -250,20 +250,48 @@ def strong_aug(object_type):
         additional_targets=object_type
     )
 
+def cropped_images(images, size):
+    cropped_images = images
+    min=np.array(np.nonzero(images)).min(axis=1)
+    max=np.array(np.nonzero(images)).max(axis=1)
+    cropped_images = images[:, min[1]:max[1], min[2]:max[2], :]
+    results = None
+    for origin_image in cropped_images:
+        origin_image = cv2.resize(origin_image, (size, size))
+        image = cv2.cvtColor(origin_image, cv2.COLOR_BGR2RGB)
+        image = np.expand_dims(image, 0)
+        if results is None:
+            results = image
+        else:
+            results = np.concatenate([results, image], 0)
+    return results
+
 def augment_data(folder, feature, n_generated_samples, input_folder, output_folder):
     for type_name in os.listdir(folder + '/' + feature):
-        for idx in range(n_generated_samples + 1, 50, 1):
+        for idx in range(n_generated_samples):
 
             aug_input = {}
             image_name = []
             object_type = {}
             file_path_list = {}
 
+            images = None
+            file_paths = []
+
             for id, image in enumerate(os.listdir(folder + '/' + feature + '/' + type_name)):
                 # load the image
                 file_path = folder + '/' + feature + '/' + type_name + '/' + image
                 image = cv2.imread(file_path)
-                image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+                image = np.expand_dims(image, 0)
+                if images is None:
+                    images = image
+                else:
+                    images = np.concatenate([images, image], 0)
+                file_paths.append(file_path)
+
+            images = cropped_images(images, 224)
+            
+            for id, (image, file_path) in enumerate(zip(images, file_paths)):
                 if id == 0:
                     aug_input['image'] = image
                     file_path_list['image'] = file_path
@@ -284,7 +312,7 @@ def augment_data(folder, feature, n_generated_samples, input_folder, output_fold
                 file_path = file_path_list[name]
                 file_path = file_path.replace(input_folder, output_folder)
                 file_paths = file_path.split('/')
-                file_paths[6] = f'{feature}_{str(idx)}'
+                file_paths[3] = f'{feature}_{str(idx)}'
                 file_path = '/'.join(file_paths)
                 folder_name = '/'.join(file_paths[:-1])
                 if not os.path.isdir(folder_name):
