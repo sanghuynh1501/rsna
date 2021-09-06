@@ -4,16 +4,16 @@ from util import extract_feature_512, generate_image
 import numpy as np
 from tqdm import tqdm
 import tensorflow as tf
-from models import AutoEncoder
+from models import AutoEncoder, AutoEncoderFull
 
 STACK_SIZE = 256
-DATA_FEATURE = 'data/test_origin'
+DATA_FEATURE = 'data/feature_512'
 
-model = AutoEncoder()
+model = AutoEncoderFull()
 
 optimizer = tf.keras.optimizers.Adam(learning_rate=0.0002, beta_1=0.5)
 
-checkpoint_path = 'weights/autoencoder_relu_leaky_relu'
+checkpoint_path = 'weights/autoencoder_full'
 
 ckpt = tf.train.Checkpoint(transformer=model,
                            optimizer=optimizer)
@@ -61,7 +61,7 @@ with tqdm(total=(test_length + train_length)) as pbar:
                         link_stacks = [image_path]
                     else:
                         if image_stacks.shape[0] >= STACK_SIZE:
-                            generate_image(model, image_stacks, link_stacks, dem, isFull=False)
+                            generate_image(model, image_stacks, link_stacks, dem, DATA_FEATURE, isFull=False)
                             image_stacks = None
                             dem += 1
                         else:

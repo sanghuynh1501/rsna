@@ -85,17 +85,22 @@ def clip_data(data, lengths):
 
     return results, create_padding_mask(masks)
 
-def read_image(image_path):
-    origin_image = cv2.imread(image_path)
-    origin_image = cv2.resize(origin_image, (224, 224))
-    image = cv2.cvtColor(origin_image, cv2.COLOR_BGR2RGB)
-    image = np.expand_dims(image, 0)
-    return image
-
 def read_image_numpy(image_path, gayscale=False):
     numpy_path = image_path.replace('origin', 'feature')
     numpy_path = numpy_path.replace('.png', '.npy')
     image = np.load(numpy_path)
+    image = np.expand_dims(image, 0)
+    if not gayscale:
+        return image
+    else:
+        gray = cv2.imread(image_path, 0)
+        gray = cv2.resize(gray, (32, 32))
+        gray = np.expand_dims(gray, -1)
+        gray = np.expand_dims(gray, 0)
+        return image, gray
+
+def read_image_numpy_image(image_path, gayscale=False):
+    image = cv2.imread(image_path)
     image = np.expand_dims(image, 0)
     if not gayscale:
         return image
@@ -115,7 +120,7 @@ def extract_feature_512(model,image_stacks, link_stacks, input_folder, output_fo
     features = model.feature_extract(image_stacks)
     write_feature_512(features, link_stacks, input_folder, output_folder, isOrigin)
 
-def generate_image(model, images, links, epoch, isFull=True):
+def generate_image(model, images, links, epoch, folder, isFull=True):
     predictions = None
     if isFull:
         predictions = model(images, training=False)
@@ -125,12 +130,24 @@ def generate_image(model, images, links, epoch, isFull=True):
         image = np.reshape(image, (32, 32))
         image = (image * 127.5) + 127.5
         image = image.astype(np.int32)
-        link = link.replace('test_origin', 'image_test')
+        link = link.replace(folder, 'image_test')
         file_paths = link.split('/')
         folder_name = '/'.join(file_paths[:-1])
         if not os.path.isdir(folder_name):
             os.makedirs(folder_name)
         cv2.imwrite(f'{folder_name}/image_{epoch}_{idx}.png', image)
+
+def generate_image_only(model, images, epoch, isFull=True):
+    predictions = None
+    if isFull:
+        predictions = model(images, training=False)
+    else:
+        predictions = model.image_generate(images)
+    for idx, image in enumerate(predictions):
+        image = np.reshape(image, (32, 32))
+        image = (image * 127.5) + 127.5
+        image = image.astype(np.int32)
+        cv2.imwrite(f'images/image_{epoch}_{idx}.png', image)
 
 def get_random_sequence(folder_link, isTest=False):
     sequences = np.array([])
@@ -206,6 +223,37 @@ def image_generator(data_folder, sample_list, batch_size=128):
                         pass
             pbar.update(1)
 
+def image_generator_image(data_folder, sample_list, batch_size=128):
+    
+    images = np.array([])
+    grays = np.array([])
+
+    with tqdm(total=len(sample_list)) as pbar:
+        for sample in random_data(sample_list):
+            # Reading data (line, record) from the file
+            folder_link = f"{data_folder.decode('utf8')}/{sample.decode('utf8')}"
+            for sub_folder in os.listdir(folder_link):
+                for image in os.listdir(f'{folder_link}/{sub_folder}'):
+                    try:
+                        image, gray = read_image_numpy_image(f'{folder_link}/{sub_folder}/{image}', True)
+                        if images.shape[0] >= batch_size:
+                            images, grays = random_datas(images, grays)
+                            grays = grays.astype(np.float32)
+                            grays = (grays - 127.5) / 127.5
+                            yield images, grays
+                            images = image
+                            grays = gray
+                        else:
+                            if images.shape[0] == 0:
+                                images = image
+                                grays = gray
+                            else:
+                                images = np.concatenate([images, image], 0)
+                                grays = np.concatenate([grays, gray], 0)
+                    except:
+                        pass
+            pbar.update(1)
+
 def sequence_generator(data_folder, sample_list, labels_list, batch_size=128, isTest=False):
 
     sequences = np.array([])
@@ -258,13 +306,27 @@ def cropped_images(images, size):
     results = None
     for origin_image in cropped_images:
         origin_image = cv2.resize(origin_image, (size, size))
-        image = cv2.cvtColor(origin_image, cv2.COLOR_BGR2RGB)
         image = np.expand_dims(image, 0)
         if results is None:
             results = image
         else:
             results = np.concatenate([results, image], 0)
     return results
+
+def create_clahe(bgr):
+    lab = cv2.cvtColor(bgr, cv2.COLOR_BGR2LAB)
+    lab_planes = cv2.split(lab)
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(10, 10))
+    lab_planes[0] = clahe.apply(lab_planes[0])
+    lab = cv2.merge(lab_planes)
+    bgr = cv2.cvtColor(lab, cv2.COLOR_LAB2BGR)
+    return bgr
+
+def read_image(image_path):
+    origin_image = cv2.imread(image_path)
+    origin_image = cv2.resize(origin_image, (224, 224))
+    image = np.expand_dims(origin_image, 0)
+    return image
 
 def augment_data(folder, feature, n_generated_samples, input_folder, output_folder):
     for type_name in os.listdir(folder + '/' + feature):
@@ -281,8 +343,7 @@ def augment_data(folder, feature, n_generated_samples, input_folder, output_fold
             for id, image in enumerate(os.listdir(folder + '/' + feature + '/' + type_name)):
                 # load the image
                 file_path = folder + '/' + feature + '/' + type_name + '/' + image
-                image = cv2.imread(file_path)
-                image = np.expand_dims(image, 0)
+                image = read_image(file_path)
                 if images is None:
                     images = image
                 else:
@@ -292,6 +353,7 @@ def augment_data(folder, feature, n_generated_samples, input_folder, output_fold
             images = cropped_images(images, 224)
             
             for id, (image, file_path) in enumerate(zip(images, file_paths)):
+                image = create_clahe(image)
                 if id == 0:
                     aug_input['image'] = image
                     file_path_list['image'] = file_path
@@ -307,12 +369,11 @@ def augment_data(folder, feature, n_generated_samples, input_folder, output_fold
             
             for name in image_name:
                 image = augmented_data[name]
-                image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
                 image = cv2.resize(image, (224, 224))
                 file_path = file_path_list[name]
                 file_path = file_path.replace(input_folder, output_folder)
                 file_paths = file_path.split('/')
-                file_paths[3] = f'{feature}_{str(idx)}'
+                file_paths[6] = f'{feature}_{str(idx)}'
                 file_path = '/'.join(file_paths)
                 folder_name = '/'.join(file_paths[:-1])
                 if not os.path.isdir(folder_name):
@@ -325,7 +386,7 @@ def augment_data_split(X_data, y_data):
     new_y = []
     
     for x, y in zip(X_data, y_data):
-        for idx in range(10):
+        for idx in range(14):
             new_x.append(x + '_' + str(idx))
             new_y.append(y)
 

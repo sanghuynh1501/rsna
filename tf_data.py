@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 
 import tensorflow as tf
 
-from util import image_generator, sequence_generator
+from util import image_generator, image_generator_image, sequence_generator
 
 DATA_ORIGIN_TRAIN = 'data/origin/train'
 DATA_FEATURE_TRAIN = 'data/feature_512/train'
@@ -20,6 +20,18 @@ class AutoEncoderDataset(tf.data.Dataset):
             image_generator,
             output_signature = (
                 tf.TensorSpec(shape = (batch_size, 100352), dtype = tf.float32),
+                tf.TensorSpec(shape = (batch_size, 32, 32, 1), dtype = tf.float32),
+            ),
+            args=(folder, samples, batch_size)
+        )
+        return data
+
+class AutoEncoderImageDataset(tf.data.Dataset):
+    def __new__(self, folder, samples, batch_size):
+        data = tf.data.Dataset.from_generator(
+            image_generator_image,
+            output_signature = (
+                tf.TensorSpec(shape = (batch_size, 224, 224, 3), dtype = tf.float32),
                 tf.TensorSpec(shape = (batch_size, 32, 32, 1), dtype = tf.float32),
             ),
             args=(folder, samples, batch_size)

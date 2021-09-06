@@ -1,20 +1,21 @@
 
 import os
+import cv2
 from util import extract_feature_512
 import numpy as np
 from tqdm import tqdm
 import tensorflow as tf
-from models import AutoEncoder
+from models import AutoEncoder, AutoEncoderFull
 
 STACK_SIZE = 128
-DATA_FEATURE = 'data/feature'
+DATA_FEATURE = '/media/sang/Samsung/data_augement'
 DATA_FEATURE_512 = 'data/feature_512'
 
-model = AutoEncoder()
+model = AutoEncoderFull()
 
 optimizer = tf.keras.optimizers.Adam(learning_rate=0.0002, beta_1=0.5)
 
-checkpoint_path = 'weights/autoencoder_relu_leaky_relu'
+checkpoint_path = 'weights/autoencoder_full'
 
 ckpt = tf.train.Checkpoint(transformer=model,
                            optimizer=optimizer)
@@ -33,19 +34,19 @@ image_stacks = None
 link_stacks = []
 
 with tqdm(total=(test_length + train_length)) as pbar:
-    for data_folder in data:
+    for data_folder in ['train']:
         for sub_folder in os.listdir(DATA_FEATURE + '/' + data_folder):
             for type_image in os.listdir(DATA_FEATURE + '/' + data_folder + '/' + sub_folder):
                 for image in os.listdir(DATA_FEATURE + '/' + data_folder + '/' + sub_folder + '/' + type_image):
                     image_path = DATA_FEATURE + '/' + data_folder + '/' + sub_folder + '/' + type_image + '/' + image
-                    image = np.load(image_path)
+                    image = cv2.imread(image_path)
                     image = np.expand_dims(image, 0)
                     if image_stacks is None:
                         image_stacks = image
                         link_stacks = [image_path]
                     else:
                         if image_stacks.shape[0] >= STACK_SIZE:
-                            extract_feature_512(model, image_stacks, link_stacks)
+                            extract_feature_512(model, image_stacks, link_stacks, DATA_FEATURE, DATA_FEATURE_512, True)
                             image_stacks = image
                             link_stacks = [image_path]
                         else:
