@@ -1,3 +1,4 @@
+from i3d_inception import Inception_Inflated3d
 from tensorflow.python.keras import activations
 from tensorflow.python.keras.engine import training
 from tensorflow.python.keras.layers.core import Flatten
@@ -13,6 +14,13 @@ try:
     tf.config.experimental.set_memory_growth(physical_devices[0], True)
 except:
     pass
+
+NUM_FRAMES = 40
+FRAME_HEIGHT = 224
+FRAME_WIDTH = 224
+NUM_RGB_CHANNELS = 3
+NUM_FLOW_CHANNELS = 2
+NUM_CLASSES = 400
 
 def get_angles(pos, i, d_model):
     angle_rates = 1 / np.power(10000, (2 * (i//2)) / np.float32(d_model))
@@ -335,6 +343,79 @@ class AutoEncoderFull(Model):
         x = self.conv0(x)
         return x
 
+class AutoEncoderFull3D(Model):
+    def __init__(self):
+        super(AutoEncoderFull3D, self).__init__()
+        
+        self.leakyRelu = LeakyReLU(alpha=0.2)
+
+        self.resnet = Inception_Inflated3d(
+            include_top=False,
+            weights=None,
+            input_shape=(NUM_FRAMES, FRAME_HEIGHT, FRAME_WIDTH, NUM_RGB_CHANNELS),
+            classes=NUM_CLASSES
+        )
+
+        # self.resnet.trainable = False
+        self.flatten = Flatten()
+        self.dense0 = Dense(2048, activation='relu')
+        self.dense1 = Dense(1024, activation='relu')
+        self.dense2 = Dense(512, activation='relu')
+        self.dense3 = Dense(256 * 3 * 159)
+        self.reshape = Reshape((3, 159, 256))
+
+        self.up0 = Conv2DTranspose(128, (4,4), strides=(2,2), padding='same')
+        self.up1 = Conv2DTranspose(128, (4,4), strides=(2,2), padding='same')
+        self.up2 = Conv2DTranspose(128, (4,4), strides=(2,2), padding='same')
+        self.up3 = Conv2DTranspose(128, (4,4), strides=(1,1), padding='valid')
+        self.up4 = Conv2DTranspose(128, (4,4), strides=(1,1), padding='valid')
+        self.up5 = Conv2DTranspose(128, (3,3), strides=(1,1), padding='valid')
+        self.up6 = Conv2DTranspose(128, (3,3), strides=(1,1), padding='valid')
+        self.conv0 = Conv2D(1, (3,3), strides=(1,1), activation='tanh', padding='valid')
+
+    def call(self, x):
+        x = self.resnet(x)
+        x = self.flatten(x)
+        x = self.dense0(x)
+        x = self.dense1(x)
+        x = self.dense2(x)
+        x = self.leakyRelu(self.dense3(x))
+        x = self.leakyRelu(self.reshape(x))
+
+        x = self.leakyRelu(self.up0(x))
+        x = self.leakyRelu(self.up1(x))
+        x = self.leakyRelu(self.up2(x))
+        x = self.leakyRelu(self.up3(x))
+        x = self.leakyRelu(self.up4(x))
+        x = self.leakyRelu(self.up5(x))
+        x = self.leakyRelu(self.up6(x))
+        x = self.conv0(x)
+
+        return x
+
+    def feature_extract(self, x):
+        x = self.resnet(x)
+        x = self.flatten(x)
+        x = self.dense0(x)
+        x = self.dense1(x)
+        x = self.dense2(x)
+        return x
+    
+    def image_generate(self, x):
+        x = self.leakyRelu(self.dense3(x))
+        x = self.leakyRelu(self.reshape(x))
+
+        x = self.leakyRelu(self.up0(x))
+        x = self.leakyRelu(self.up1(x))
+        x = self.leakyRelu(self.up2(x))
+        x = self.leakyRelu(self.up3(x))
+        x = self.leakyRelu(self.up4(x))
+        x = self.leakyRelu(self.up5(x))
+        x = self.leakyRelu(self.up6(x))
+        x = self.conv0(x)
+
+        return x
+
 if __name__ == "__main__":
     # image = np.ones((32, 100352))
     # model = AutoEncoder()
@@ -343,16 +424,16 @@ if __name__ == "__main__":
     # feature = model.feature_extract(image)
     # print('feature.shape ', feature.shape)
 
-    num_layers = 2
-    d_model = 64
-    dff = 128
-    num_heads = 4
-    dropout_rate = 0.3
+    # num_layers = 2
+    # d_model = 64
+    # dff = 128
+    # num_heads = 4
+    # dropout_rate = 0.3
 
-    transformer = AutoEncoderFull()
+    model = AutoEncoderFull3D()
 
-    image = np.ones((32, 224, 224, 3))
-    enc_output = transformer(image, training=False)
+    image = np.ones((8, 40, 224, 224, 3))
+    enc_output = model(image, training=False)
     print('enc_output.shape ', enc_output.shape)
 
     # temp_input = tf.random.uniform((64, 38), dtype=tf.int64, minval=0, maxval=200)

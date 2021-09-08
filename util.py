@@ -60,6 +60,15 @@ def padding_data(data, max_len=1000):
         data = np.concatenate([data, np.zeros((1, 512))], 0)
     return data
 
+def padding_image(data, size, dim, max_len=1000):
+    if dim != 1:
+        while len(data) < max_len:
+            data = np.concatenate([data, np.zeros((1, size, size, dim))], 0)
+    else:
+        while data.shape[2] < max_len:
+            data = np.concatenate([data, np.zeros((1, size, size, dim))], 2)
+    return data
+
 def clip_data(data, lengths):
     max_length = np.max(lengths)
 
@@ -127,7 +136,7 @@ def generate_image(model, images, links, epoch, folder, isFull=True):
     else:
         predictions = model.image_generate(images)
     for idx, (image, link) in enumerate(zip(predictions, links)):
-        image = np.reshape(image, (32, 32))
+        image = np.reshape(image, (32, 640 * 2))
         image = (image * 127.5) + 127.5
         image = image.astype(np.int32)
         link = link.replace(folder, 'image_test')
@@ -144,7 +153,8 @@ def generate_image_only(model, images, epoch, isFull=True):
     else:
         predictions = model.image_generate(images)
     for idx, image in enumerate(predictions):
-        image = np.reshape(image, (32, 32))
+        print('image.shape ', image.shape)
+        image = np.reshape(image, (32, 640 * 2))
         image = (image * 127.5) + 127.5
         image = image.astype(np.int32)
         cv2.imwrite(f'images/image_{epoch}_{idx}.png', image)
@@ -232,7 +242,7 @@ def image_generator_image(data_folder, sample_list, batch_size=128):
         for sample in random_data(sample_list):
             # Reading data (line, record) from the file
             folder_link = f"{data_folder.decode('utf8')}/{sample.decode('utf8')}"
-            for sub_folder in os.listdir(folder_link):
+            for sub_folder in ['FLAIR']:
                 for image in os.listdir(f'{folder_link}/{sub_folder}'):
                     try:
                         image, gray = read_image_numpy_image(f'{folder_link}/{sub_folder}/{image}', True)
@@ -251,7 +261,64 @@ def image_generator_image(data_folder, sample_list, batch_size=128):
                                 images = np.concatenate([images, image], 0)
                                 grays = np.concatenate([grays, gray], 0)
                     except:
+                        print('error ')
                         pass
+            pbar.update(1)
+
+def image_generator_image_3d(data_folder, sample_list, batch_size=128):
+    
+    images = np.array([])
+    grays = np.array([])
+
+    with tqdm(total=len(sample_list)) as pbar:
+        for sample in random_data(sample_list):
+            # Reading data (line, record) from the file
+            folder_link = f"{data_folder.decode('utf8')}/{sample.decode('utf8')}"
+            for sub_folder in ['T1w']:
+                if os.path.isdir(f'{folder_link}/{sub_folder}'):
+                    image3d = None 
+                    gray3d = None
+                    folder = os.listdir(f'{folder_link}/{sub_folder}')
+                    folder.sort(key=lambda x: int(x.replace('.', '-').split('-')[1]))
+
+                    start = len(folder) // 2 - 20
+                    end = len(folder) // 2 + 20
+                    
+                    if start < 0:
+                        start = 0
+                        end += 40
+
+                    for idx, image in enumerate(folder[start:end]):
+                        image, gray = read_image_numpy_image(f'{folder_link}/{sub_folder}/{image}', True)
+                        if image3d is None:
+                            image3d = image
+                        else:
+                            image3d = np.concatenate([image3d, image], 0)
+                        
+                        if gray3d is None:
+                            gray3d = gray
+                        else:
+                            gray3d = np.concatenate([gray3d, gray], 2)
+                    
+                    image3d = padding_image(image3d, 224, 3, 40)
+                    gray3d = padding_image(gray3d, 32, 1, 640 * 2)
+
+                    image3d = np.expand_dims(image3d, 0)
+                            
+                    if images.shape[0] >= batch_size:
+                        images, grays = random_datas(images, grays)
+                        grays = grays.astype(np.float32)
+                        grays = (grays - 127.5) / 127.5
+                        yield images, grays
+                        images = image3d
+                        grays = gray3d
+                    else:
+                        if images.shape[0] == 0:
+                            images = image3d
+                            grays = gray3d
+                        else:
+                            images = np.concatenate([images, image3d], 0)
+                            grays = np.concatenate([grays, gray3d], 0)
             pbar.update(1)
 
 def sequence_generator(data_folder, sample_list, labels_list, batch_size=128, isTest=False):
