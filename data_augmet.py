@@ -4,7 +4,7 @@ from tqdm import tqdm
 
 STACK_SIZE = 256
 DATA_ORIGIN = 'data/origin'
-DATA_AUGEMENT = '/media/sang/Samsung/data_augement'
+DATA_AUGEMENT = '/media/sang/Samsung/data_augement_new'
 
 data = os.listdir(DATA_ORIGIN)
 test_length = len(os.listdir(DATA_ORIGIN + '/' + 'test'))

@@ -1,16 +1,20 @@
 import os
+import joblib
 from tqdm import tqdm
 from util import augment_data_split, random_datas
 import numpy as np
 import pickle
 from sklearn.metrics import accuracy_score
 from sklearn.metrics import roc_auc_score
-from xgboost import XGBClassifier
+from sklearn.svm import SVC
 from sklearn.model_selection import cross_val_score
 from sklearn.model_selection import RepeatedStratifiedKFold
+from sklearn.model_selection import GridSearchCV
+from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier, BaggingClassifier
+from sklearn.semi_supervised import SelfTrainingClassifier
 
-DATA_FEATURE_TRAIN = 'data/feature_512/train'
-DATA_FEATURE_TEST = 'data/feature_512/train'
+DATA_FEATURE_TRAIN = 'data/feature_512000/train'
+DATA_FEATURE_TEST = 'data/feature_512000/train'
 
 with open('pickle/X_train.pkl', 'rb') as f:
     X_train = pickle.load(f)
@@ -31,114 +35,92 @@ with open('pickle/y_test.pkl', 'rb') as f:
 X = None
 y = None
 
-X_train_folder, y_train = augment_data_split(X_train, y_train)
-X_test_folder, y_test = augment_data_split(X_test, y_test)
+X_train_folder, y_train_origin = X_train, y_train
+X_test_folder, y_test_origin = X_test, y_test
 
 label_true = 0
 label_false = 0
 
-with tqdm(total=len(X_train_folder + X_test_folder)) as pbar:
-    for sub_folder, label in zip(X_train_folder + X_test_folder, y_train + y_test):
-        if os.path.isdir(DATA_FEATURE_TRAIN + '/' + sub_folder):
-            for type_image in ['FLAIR']:
-                if os.path.isdir(DATA_FEATURE_TRAIN + '/' + sub_folder + '/' + type_image):
-                    for image in os.listdir(DATA_FEATURE_TRAIN + '/' + sub_folder + '/' + type_image):
-                        image_path = DATA_FEATURE_TRAIN + '/' + sub_folder + '/' + type_image + '/' + image
-                        image = np.load(image_path)
-                        image = np.expand_dims(image, 0)
-                        label = np.array([int(label)])
-                        if X is None:
-                            X = image
-                            y = label
-                        else:
-                            X = np.concatenate([X, image], 0)
-                            y = np.concatenate([y, label], 0)
-        pbar.update(1)
-
-# fit model no training data
-model = XGBClassifier(objective='binary:logistic', eval_metric='auc')
+X_folder = X_train_folder + X_test_folder
+y_origin = y_train_origin + y_test_origin
 
 cv = RepeatedStratifiedKFold(n_splits=10, n_repeats=3, random_state=1)
-# evaluate model
-# scores = cross_val_score(model, X, y, scoring='roc_auc', cv=cv, n_jobs=-1)
-# # summarize performance
-# print('scores ', scores)
-# print('Mean ROC AUC: %.5f' % np.mean(scores))
-
-# model.fit(x_feature_train, label_train)
-
-# y_pred = model.predict(x_feature_train)
-# predictions = [round(value) for value in y_pred]
-
-# accuracy = roc_auc_score(label_train, predictions)
-# print("Accuracy: %.2f%%" % (accuracy * 100.0))
-
-# y_pred = model.predict(x_feature_test)
-# predictions = [round(value) for value in y_pred]
-
-# accuracy = roc_auc_score(label_test, predictions)
-# print("Accuracy: %.2f%%" % (accuracy * 100.0))
 
 train_score = []
 test_score = []
-for fold, (train_index, test_index) in enumerate(cv.split(X, y)):
+for fold, (train_index, test_index) in enumerate(cv.split(X_folder, y_origin)):
     print('=========================================================')
     print("fold:", fold, len(train_index), len(test_index))
-    X_train, X_test = X[train_index], X[test_index]
-    y_train, y_test = y[train_index], y[test_index]
 
-    model = XGBClassifier(objective='binary:logistic', eval_metric='auc')
-    model.fit(X_train, y_train)
+    X_train= None
+    X_train_NO = None
+
+    y_train = None
+    y_train_NO = None
+
+    for idx in train_index:
+        sub_folder = X_folder[idx]
+        label = y_origin[idx]
+        if os.path.isdir(DATA_FEATURE_TRAIN + '/' + sub_folder):
+            if os.path.isdir(DATA_FEATURE_TRAIN + '/' + sub_folder):
+                for image in os.listdir(DATA_FEATURE_TRAIN + '/' + '/' + sub_folder):
+                    image_path = DATA_FEATURE_TEST + '/' + '/' + sub_folder + '/' + image
+                    image = np.load(image_path)
+                    image = np.expand_dims(image, 0)
+                    label = np.array([int(label)])
+                    if X_train is None:
+                        X_train = image
+                        y_train = label
+                    else:
+                        X_train = np.concatenate([X_train, image], 0)
+                        y_train = np.concatenate([y_train, label], 0)
+
+    for sub_folder in os.listdir(DATA_FEATURE_TRAIN):
+        if 'BraTS20' in sub_folder:
+            if os.path.isdir(DATA_FEATURE_TRAIN + '/' + sub_folder):
+                for image in os.listdir(DATA_FEATURE_TRAIN + '/' + '/' + sub_folder):
+                    image_path = DATA_FEATURE_TEST + '/' + '/' + sub_folder + '/' + image
+                    image = np.load(image_path)
+                    image = np.expand_dims(image, 0)
+                    label = np.array([-1])
+                    if X_train_NO is None:
+                        X_train_NO = image
+                        y_train_NO = label
+                    else:
+                        X_train_NO = np.concatenate([X_train_NO, image], 0)
+                        y_train_NO = np.concatenate([y_train_NO, label], 0)
+
+    svc = SVC(probability=True, gamma="auto")
+    model = SelfTrainingClassifier(svc)
+    
+    X_train_mix = np.concatenate([X_train, X_train_NO], 0)
+    y_train_mix = np.concatenate([y_train, y_train_NO], 0)
+    X_train_mix, y_train_mix = random_datas(X_train_mix, y_train_mix)
+    model.fit(X_train_mix, y_train_mix)
 
     y_pred = model.predict(X_train)
-    predictions = [round(value) for value in y_pred]
-
-    accuracy = roc_auc_score(y_train, predictions)
+    accuracy = roc_auc_score(y_train, y_pred)
     train_score.append(accuracy * 100.0)
     print("Train Accuracy: %.2f%%" % (accuracy * 100.0))
 
-    y_pred = model.predict(X_test)
-    predictions = [round(value) for value in y_pred]
+    total = 0
+    total_true = 0
+    for idx in test_index:
+        sub_folder = X_folder[idx]
+        label = y_origin[idx]
+        for image in os.listdir(DATA_FEATURE_TRAIN + '/' + '/' + sub_folder):
+            image_path = DATA_FEATURE_TRAIN + '/' + '/' + sub_folder + '/' + image
+            image = np.load(image_path)
+            image = np.expand_dims(image, 0)
+            y_pred = model.predict_proba(image)
+                                                    
+            if np.argmax(y_pred[0]) == label:
+                total_true += 1
+            total += 1
 
-    accuracy = roc_auc_score(y_test, predictions)
-    test_score.append(accuracy * 100.0)
-    print("Test Accuracy: %.2f%%" % (accuracy * 100.0))
+    accuracy = total_true / total * 100.0
+    test_score.append(accuracy)
 
-    X_test_folder_train = [(X_train_folder + X_test_folder)[id] for id in train_index]
-    X_test_folder_test = [(X_train_folder + X_test_folder)[id] for id in test_index]
+    print("Test Accuracy: %.2f%%" % (accuracy))
 
-print(np.mean(train_score), np.mean(test_score))
-
-total = 0
-total_true = 0
-for sub_folder, label in zip(X_test_folder_train, y_train):
-    if os.path.isdir(DATA_FEATURE_TRAIN + '/' + sub_folder):
-        for type_image in ['FLAIR']:
-            if os.path.isdir(DATA_FEATURE_TRAIN + '/' + sub_folder + '/' + type_image):
-                for image in os.listdir(DATA_FEATURE_TRAIN + '/' + '/' + sub_folder + '/' + type_image):
-                    image_path = DATA_FEATURE_TEST + '/' + '/' + sub_folder + '/' + type_image + '/' + image
-                    image = np.load(image_path)
-                    image = np.expand_dims(image, 0)
-                    y_pred = model.predict(image)
-                    if round(y_pred[0]) == label:
-                        total_true += 1
-                    total += 1
-
-print(total, total_true, (total_true / total * 100))
-
-total = 0
-total_true = 0
-for sub_folder, label in zip(X_test_folder_test, y_test):
-    if os.path.isdir(DATA_FEATURE_TEST + '/' + sub_folder):
-        for type_image in ['FLAIR']:
-            if os.path.isdir(DATA_FEATURE_TRAIN + '/' + sub_folder + '/' + type_image):
-                for image in os.listdir(DATA_FEATURE_TEST + '/' + '/' + sub_folder + '/' + type_image):
-                    image_path = DATA_FEATURE_TEST + '/' + '/' + sub_folder + '/' + type_image + '/' + image
-                    image = np.load(image_path)
-                    image = np.expand_dims(image, 0)
-                    y_pred = model.predict(image)
-                    if round(y_pred[0]) == label:
-                        total_true += 1
-                    total += 1
-
-print(total, total_true, (total_true / total * 100))
+print('score ', np.mean(np.array(test_score)))

@@ -7,7 +7,7 @@ import numpy as np
 
 import tensorflow as tf
 from tensorflow.keras import Model, Input
-from tensorflow.keras.layers import Conv2D, GlobalAveragePooling1D, Reshape, Dense, LeakyReLU, Conv2DTranspose, GRU, Dropout
+from tensorflow.keras.layers import Conv2D, Conv3D, MaxPool3D, UpSampling3D, GlobalAveragePooling1D, Reshape, Dense, LeakyReLU, Conv2DTranspose, GRU, Conv3DTranspose, ReLU
 
 physical_devices = tf.config.list_physical_devices('GPU')
 try:
@@ -16,9 +16,9 @@ except:
     pass
 
 NUM_FRAMES = 40
-FRAME_HEIGHT = 224
-FRAME_WIDTH = 224
-NUM_RGB_CHANNELS = 3
+FRAME_HEIGHT = 240
+FRAME_WIDTH = 240
+NUM_RGB_CHANNELS = 1
 NUM_FLOW_CHANNELS = 2
 NUM_CLASSES = 400
 
@@ -347,7 +347,7 @@ class AutoEncoderFull3D(Model):
     def __init__(self):
         super(AutoEncoderFull3D, self).__init__()
         
-        self.leakyRelu = LeakyReLU(alpha=0.2)
+        self.leakyRelu = ReLU()
 
         self.resnet = Inception_Inflated3d(
             include_top=False,
@@ -359,19 +359,18 @@ class AutoEncoderFull3D(Model):
         # self.resnet.trainable = False
         self.flatten = Flatten()
         self.dense0 = Dense(2048, activation='relu')
-        self.dense1 = Dense(1024, activation='relu')
-        self.dense2 = Dense(512, activation='relu')
-        self.dense3 = Dense(256 * 3 * 159)
-        self.reshape = Reshape((3, 159, 256))
+        self.dense1 = Dense(2048, activation='relu')
+        self.dense2 = Dense(2048, activation='relu')
+        self.dense3 = Dense(1024, activation='relu')
+        self.dense4 = Dense(1024, activation='relu')
+        self.dense5 = Dense(1024, activation='relu')
+        self.dense6 = Dense(3 * 2 * 2 * 128, activation='relu')
+        self.reshape = Reshape((3, 2, 2, 128))
 
-        self.up0 = Conv2DTranspose(128, (4,4), strides=(2,2), padding='same')
-        self.up1 = Conv2DTranspose(128, (4,4), strides=(2,2), padding='same')
-        self.up2 = Conv2DTranspose(128, (4,4), strides=(2,2), padding='same')
-        self.up3 = Conv2DTranspose(128, (4,4), strides=(1,1), padding='valid')
-        self.up4 = Conv2DTranspose(128, (4,4), strides=(1,1), padding='valid')
-        self.up5 = Conv2DTranspose(128, (3,3), strides=(1,1), padding='valid')
-        self.up6 = Conv2DTranspose(128, (3,3), strides=(1,1), padding='valid')
-        self.conv0 = Conv2D(1, (3,3), strides=(1,1), activation='tanh', padding='valid')
+        self.up0 = Conv3DTranspose(128, (3,3,3), strides=(1,1,1), padding='valid')
+        self.up1 = Conv3DTranspose(128, (4,4,4), strides=(2,2,2), padding='same')
+        self.up2 = Conv3DTranspose(128, (4,4,4), strides=(2,2,2), padding='same')
+        self.up3 = Conv3DTranspose(1, (4,4,4), strides=(2,2,2), padding='same', activation='sigmoid')
 
     def call(self, x):
         x = self.resnet(x)
@@ -379,17 +378,16 @@ class AutoEncoderFull3D(Model):
         x = self.dense0(x)
         x = self.dense1(x)
         x = self.dense2(x)
-        x = self.leakyRelu(self.dense3(x))
+        x = self.dense3(x)
+        x = self.dense4(x)
+        x = self.dense5(x)
+        x = self.leakyRelu(self.dense6(x))
         x = self.leakyRelu(self.reshape(x))
 
         x = self.leakyRelu(self.up0(x))
         x = self.leakyRelu(self.up1(x))
         x = self.leakyRelu(self.up2(x))
-        x = self.leakyRelu(self.up3(x))
-        x = self.leakyRelu(self.up4(x))
-        x = self.leakyRelu(self.up5(x))
-        x = self.leakyRelu(self.up6(x))
-        x = self.conv0(x)
+        x = self.up3(x)
 
         return x
 
@@ -399,22 +397,138 @@ class AutoEncoderFull3D(Model):
         x = self.dense0(x)
         x = self.dense1(x)
         x = self.dense2(x)
+        x = self.dense3(x)
+        x = self.dense4(x)
+        x = self.dense5(x)
+
         return x
     
     def image_generate(self, x):
-        x = self.leakyRelu(self.dense3(x))
+        x = self.leakyRelu(self.dense6(x))
         x = self.leakyRelu(self.reshape(x))
 
         x = self.leakyRelu(self.up0(x))
         x = self.leakyRelu(self.up1(x))
         x = self.leakyRelu(self.up2(x))
-        x = self.leakyRelu(self.up3(x))
-        x = self.leakyRelu(self.up4(x))
-        x = self.leakyRelu(self.up5(x))
-        x = self.leakyRelu(self.up6(x))
-        x = self.conv0(x)
+        x = self.up3(x)
 
         return x
+
+
+class AutoEncoderFull3DNew(Model):
+    def __init__(self):
+        super(AutoEncoderFull3DNew, self).__init__()
+        
+        self.conv1 = Conv3D(16, 3, activation='relu')
+        self.conv2 = Conv3D(32, 3, activation='relu')
+        self.conv3 = Conv3D(96, 2, activation='relu')
+        self.pool1 = MaxPool3D(2)
+        self.pool2 = MaxPool3D(3)
+        self.pool3 = MaxPool3D(2)
+        self.enc_linear = Dense(512, activation='relu')
+        
+        # Decoder
+        self.deconv1 = Conv3DTranspose(32, 2, activation='relu')
+        self.deconv2 = Conv3DTranspose(16, 3, activation='relu')
+        self.deconv3 = Conv3DTranspose(16, 3, activation='relu')
+        self.deconv4 = Conv3DTranspose(4, (3, 1, 1), activation='sigmoid')
+        self.unpool1 = UpSampling3D(2)
+        self.unpool2 = UpSampling3D(3)
+        self.unpool3 = UpSampling3D(2)
+
+        self.dec_linear = Dense(103968, activation='relu')
+
+        self.flatten = Flatten()
+        self.reshape = Reshape((3, 19, 19, 96))
+    
+    def encode(self, x):
+        # Encoder
+        x = self.conv1(x)
+        x = self.pool1(x)
+        x = self.conv2(x)
+        x = self.pool2(x)
+        x = self.conv3(x)
+        x = self.pool3(x)
+        x = self.flatten(x)
+        x = self.enc_linear(x)
+
+        return x
+    
+    def decode(self, x):
+        x = self.dec_linear(x)
+        x = self.reshape(x)
+        
+        x = self.unpool1(x)
+        x = self.deconv1(x)
+        x = self.unpool2(x)
+        x = self.deconv2(x)
+        x = self.unpool3(x)
+        x = self.deconv3(x)
+        x = self.deconv4(x)
+        return x
+        
+    def call(self, x):
+        feature = self.encode(x)
+        out = self.decode(feature)
+        return out
+
+class AutoEncoderFull3DNew1(Model):
+    def __init__(self):
+        super(AutoEncoderFull3DNew1, self).__init__()
+        
+        self.conv1 = Conv3D(16, 3, activation='relu')
+        self.conv2 = Conv3D(32, 3, activation='relu')
+        self.conv3 = Conv3D(96, 2, activation='relu')
+        self.conv4 = Conv3D(128, 2, activation='relu')
+        self.pool1 = MaxPool3D(3)
+        self.pool2 = MaxPool3D(2)
+        self.enc_linear = Dense(512, activation='relu')
+        
+        # Decoder
+        self.deconv1 = Conv3DTranspose(96, 2, activation='relu')
+        self.deconv2 = Conv3DTranspose(32, 2, activation='relu')
+        self.deconv3 = Conv3DTranspose(32, (1, 2, 2), activation='relu')
+        self.deconv4 = Conv3DTranspose(16, 3, activation='relu')
+        self.deconv5 = Conv3DTranspose(16, (1, 2, 2), activation='relu')
+        self.deconv6 = Conv3DTranspose(4, 3, activation='sigmoid')
+        self.unpool1 = UpSampling3D(2)
+        self.unpool2 = UpSampling3D(3)
+
+        self.dec_linear = Dense(829440, activation='relu')
+
+        self.flatten = Flatten()
+        self.reshape = Reshape((5, 36, 36, 128))
+    
+    def encode(self, x):
+        # Encoder
+        x = self.conv1(x)
+        x = self.pool1(x)
+        x = self.conv2(x)
+        x = self.pool2(x)
+        x = self.conv3(x)
+        x = self.conv4(x)
+        x = self.flatten(x)
+        x = self.enc_linear(x)
+
+        return x
+    
+    def decode(self, x):
+        x = self.dec_linear(x)
+        x = self.reshape(x)
+        x = self.deconv1(x)
+        x = self.deconv2(x)
+        x = self.unpool1(x)
+        x = self.deconv3(x)
+        x = self.deconv4(x)
+        x = self.unpool2(x)
+        x = self.deconv5(x)
+        x = self.deconv6(x)
+        return x
+        
+    def call(self, x):
+        feature = self.encode(x)
+        out = self.decode(feature)
+        return out
 
 if __name__ == "__main__":
     # image = np.ones((32, 100352))
@@ -430,9 +544,9 @@ if __name__ == "__main__":
     # num_heads = 4
     # dropout_rate = 0.3
 
-    model = AutoEncoderFull3D()
+    model = AutoEncoderFull3DNew1()
 
-    image = np.ones((8, 40, 224, 224, 3))
+    image = np.ones((1, 50, 240, 240, 4))
     enc_output = model(image, training=False)
     print('enc_output.shape ', enc_output.shape)
 

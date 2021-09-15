@@ -31,7 +31,7 @@ class AutoEncoderImageDataset(tf.data.Dataset):
         data = tf.data.Dataset.from_generator(
             image_generator_image,
             output_signature = (
-                tf.TensorSpec(shape = (batch_size, 224, 224, 3), dtype = tf.float32),
+                tf.TensorSpec(shape = (batch_size, 240, 240, 1), dtype = tf.float32),
                 tf.TensorSpec(shape = (batch_size, 32, 32, 1), dtype = tf.float32),
             ),
             args=(folder, samples, batch_size)
@@ -43,8 +43,8 @@ class AutoEncoderImage3DDataset(tf.data.Dataset):
         data = tf.data.Dataset.from_generator(
             image_generator_image_3d,
             output_signature = (
-                tf.TensorSpec(shape = (batch_size, 40, 224, 224, 3), dtype = tf.float32),
-                tf.TensorSpec(shape = (batch_size, 32, 640 * 2, 1), dtype = tf.float32),
+                tf.TensorSpec(shape = (batch_size, 50, 240, 240, 4), dtype = tf.float32),
+                tf.TensorSpec(shape = (batch_size, 50, 240, 240, 4), dtype = tf.float32),
             ),
             args=(folder, samples, batch_size)
         )
